@@ -1,0 +1,78 @@
+// Banco de dados: Postgres gratuito do Supabase.
+// "url" usa a connection pooling (porta 6543) - necessária para funções
+// serverless da Vercel. "directUrl" usa a conexão direta (porta 5432),
+// exigida pelo Prisma só na hora de rodar migrations.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id           String    @id @default(uuid())
+  username     String    @unique
+  passwordHash String    @map("password_hash")
+  avatarColor  String    @default("blue") @map("avatar_color")
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  // preparado para status online/offline no futuro
+  isOnline     Boolean   @default(false) @map("is_online")
+  lastSeenAt   DateTime? @map("last_seen_at")
+
+  memberships  ConversationMember[]
+  messages     Message[]
+
+  @@map("users")
+}
+
+// Conversa privada (1 para 1) ou grupo (isGroup = true)
+model Conversation {
+  id        String   @id @default(uuid())
+  isGroup   Boolean  @default(false) @map("is_group")
+  name      String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  members  ConversationMember[]
+  messages Message[]
+
+  @@map("conversations")
+}
+
+// Quem participa de qual conversa
+model ConversationMember {
+  id             String   @id @default(uuid())
+  userId         String   @map("user_id")
+  conversationId String   @map("conversation_id")
+  joinedAt       DateTime @default(now()) @map("joined_at")
+  isAdmin        Boolean  @default(false) @map("is_admin")
+
+  user         User         @relation(fields: [userId], references: [id])
+  conversation Conversation @relation(fields: [conversationId], references: [id])
+
+  @@unique([userId, conversationId])
+  @@map("conversation_members")
+}
+
+model Message {
+  id             String   @id @default(uuid())
+  content        String
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  // preparado para funcionalidades futuras
+  type           String   @default("text")
+  fileUrl        String?  @map("file_url")
+  isEdited       Boolean  @default(false) @map("is_edited")
+
+  senderId       String   @map("sender_id")
+  conversationId String   @map("conversation_id")
+
+  sender       User         @relation(fields: [senderId], references: [id])
+  conversation Conversation @relation(fields: [conversationId], references: [id])
+
+  @@map("messages")
+}
