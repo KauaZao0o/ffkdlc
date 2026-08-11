@@ -14,7 +14,7 @@ export default function MessageBubble({ message, isOwn, onDelete }) {
       {!isOwn && (
         <span style={{ fontSize: 11, color: "#888", marginBottom: 2 }}>{message.sender?.username}</span>
       )}
-      <div style={{ display: "flex", alignItems: "center", gap: 6, flexDirection: isOwn ? "row-reverse" : "row" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 6, flexDirection: isOwn ? "row-reverse" : "row", minWidth: 0 }}>
         <div
           style={{
             background: isOwn ? "#185fa5" : "#f0f0ee",
@@ -23,6 +23,9 @@ export default function MessageBubble({ message, isOwn, onDelete }) {
             borderRadius: 12,
             maxWidth: "70%",
             fontSize: 14,
+            wordBreak: "break-word",
+            overflowWrap: "anywhere",
+            whiteSpace: "pre-wrap",
           }}
         >
           {message.content}

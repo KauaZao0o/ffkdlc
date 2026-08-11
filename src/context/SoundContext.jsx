@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState } from "react";
-import { playChime } from "@/lib/sound";
+import { playChime, unlockAudio } from "@/lib/sound";
 
 const SoundContext = createContext(null);
 const STORAGE_KEY = "chat-sound-enabled";
@@ -13,6 +13,23 @@ export function SoundProvider({ children }) {
   useEffect(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved !== null) setEnabled(saved === "true");
+  }, []);
+
+  // Destrava o áudio assim que a pessoa interage com a página pela
+  // primeira vez (clique ou tecla) - necessário em navegadores como o
+  // Safari, que bloqueiam som sem uma interação direta antes.
+  useEffect(() => {
+    function handleFirstInteraction() {
+      unlockAudio();
+    }
+
+    window.addEventListener("click", handleFirstInteraction);
+    window.addEventListener("keydown", handleFirstInteraction);
+
+    return () => {
+      window.removeEventListener("click", handleFirstInteraction);
+      window.removeEventListener("keydown", handleFirstInteraction);
+    };
   }, []);
 
   function toggle() {
