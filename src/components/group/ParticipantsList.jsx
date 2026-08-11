@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext.jsx";
 
-export default function ParticipantsList({ conversation, onGroupDeleted }) {
+export default function ParticipantsList({ conversation, onGroupDeleted, onLeftGroup }) {
   const [participants, setParticipants] = useState([]);
   const { user } = useAuth();
 
@@ -24,7 +24,7 @@ export default function ParticipantsList({ conversation, onGroupDeleted }) {
 
   async function handleDeleteGroup() {
     const confirmed = window.confirm(
-      `Tem certeza que deseja excluir o grupo "${conversation.name}"? Essa ação apaga todas as mensagens e não pode ser desfeita.`
+      `Tem certeza que deseja excluir o grupo "${conversation.name}" para todo mundo? Essa ação apaga todas as mensagens e não pode ser desfeita.`
     );
     if (!confirmed) return;
 
@@ -33,11 +33,28 @@ export default function ParticipantsList({ conversation, onGroupDeleted }) {
       credentials: "include",
     });
 
+    const data = await res.json();
     if (res.ok) {
       onGroupDeleted(conversation.id);
     } else {
-      const data = await res.json();
       alert(data.error || "Não foi possível excluir o grupo.");
+    }
+  }
+
+  async function handleLeaveGroup() {
+    const confirmed = window.confirm(`Sair do grupo "${conversation.name}"? Você vai parar de receber mensagens dele.`);
+    if (!confirmed) return;
+
+    const res = await fetch(`/api/conversations/${conversation.id}/leave`, {
+      method: "POST",
+      credentials: "include",
+    });
+
+    const data = await res.json();
+    if (res.ok) {
+      onLeftGroup(conversation.id);
+    } else {
+      alert(data.error || "Não foi possível sair do grupo.");
     }
   }
 
@@ -71,14 +88,16 @@ export default function ParticipantsList({ conversation, onGroupDeleted }) {
         ))}
       </div>
 
-      {isAdmin && (
-        <button
-          onClick={handleDeleteGroup}
-          style={{ color: "#c0392b", borderColor: "#c0392b", fontSize: 13 }}
-        >
-          Excluir grupo
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        <button onClick={handleLeaveGroup} style={{ fontSize: 13 }}>
+          Sair do grupo
         </button>
-      )}
+        {isAdmin && (
+          <button onClick={handleDeleteGroup} style={{ color: "#c0392b", borderColor: "#c0392b", fontSize: 13 }}>
+            Excluir grupo para todos
+          </button>
+        )}
+      </div>
     </div>
   );
 }

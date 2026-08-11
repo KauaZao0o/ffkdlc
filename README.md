@@ -114,12 +114,21 @@ chat-next/
   que, mesmo se o Realtime falhar por algum motivo (RLS mal configurado,
   rede, etc), as mensagens continuam chegando sem precisar dar refresh.
 - **Apagar mensagem**: passe o mouse sobre uma mensagem sua para ver o
-  ícone de lixeira. Só quem escreveu a mensagem pode apagá-la
-  (`DELETE /api/conversations/[id]/messages/[messageId]`).
-- **Apagar grupo**: o participante marcado como administrador (quem criou
-  o grupo) vê um botão "Excluir grupo" no painel de participantes. Isso
-  apaga o grupo e, em cascata, todas as mensagens e participações ligadas
-  a ele (`DELETE /api/conversations/[id]`).
+  ícone de lixeira. Só quem escreveu a mensagem pode apagá-la.
+- **Três ações de grupo, como no WhatsApp**:
+  - **Apagar para mim** (botão no topo da conversa, funciona em qualquer
+    conversa): some da sua lista, mas continua existindo para os outros.
+    Se chegar mensagem nova depois, ela reaparece sozinha.
+  - **Sair do grupo** (painel de participantes, qualquer membro): você
+    deixa de participar de verdade. Se você era o único admin, o
+    participante mais antigo vira admin automaticamente.
+  - **Excluir grupo para todos** (painel de participantes, só admin):
+    apaga o grupo e todas as mensagens em cascata.
+
+> **Importante**: essas funcionalidades dependem da migration que
+> adiciona `onDelete: Cascade` e o campo `hiddenAt`. Depois de atualizar
+> o projeto, rode `npx prisma migrate dev` de novo antes de testar -
+> veja o Passo 2 mais abaixo.
 
 ## Onde adicionar as funcionalidades futuras
 

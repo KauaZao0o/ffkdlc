@@ -20,22 +20,30 @@ export async function GET(request) {
     },
   });
 
-  const conversations = memberships.map((m) => {
-    const conv = m.conversation;
-    const otherMembers = conv.members.map((mem) => mem.user).filter((u) => u.id !== userId);
+  const conversations = memberships
+    .filter((m) => {
+      // Se o usuário "apagou para mim" e não chegou mensagem nova depois
+      // disso, a conversa continua escondida da lista dele.
+      if (!m.hiddenAt) return true;
+      const lastMessage = m.conversation.messages[0];
+      return lastMessage && new Date(lastMessage.createdAt) > new Date(m.hiddenAt);
+    })
+    .map((m) => {
+      const conv = m.conversation;
+      const otherMembers = conv.members.map((mem) => mem.user).filter((u) => u.id !== userId);
 
-    return {
-      id: conv.id,
-      isGroup: conv.isGroup,
-      name: conv.isGroup ? conv.name : otherMembers[0]?.username || "Conversa",
-      lastMessage: conv.messages[0] || null,
-      participants: otherMembers.map((u) => ({
-        id: u.id,
-        username: u.username,
-        avatarColor: u.avatarColor,
-      })),
-    };
-  });
+      return {
+        id: conv.id,
+        isGroup: conv.isGroup,
+        name: conv.isGroup ? conv.name : otherMembers[0]?.username || "Conversa",
+        lastMessage: conv.messages[0] || null,
+        participants: otherMembers.map((u) => ({
+          id: u.id,
+          username: u.username,
+          avatarColor: u.avatarColor,
+        })),
+      };
+    });
 
   return NextResponse.json(conversations);
 }

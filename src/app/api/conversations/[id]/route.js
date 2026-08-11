@@ -25,7 +25,21 @@ export async function DELETE(request, { params }) {
     return NextResponse.json({ error: "Só administradores do grupo podem excluí-lo." }, { status: 403 });
   }
 
-  await prisma.conversation.delete({ where: { id: params.id } });
+  try {
+    await prisma.conversation.delete({ where: { id: params.id } });
+  } catch (err) {
+    console.error(err);
+    if (err.code === "P2003") {
+      return NextResponse.json(
+        {
+          error:
+            "Não foi possível excluir: o banco ainda tem mensagens/participantes vinculados e a exclusão em cascata não está configurada. Rode 'npx prisma migrate dev' no projeto para aplicar a migration mais recente.",
+        },
+        { status: 500 }
+      );
+    }
+    return NextResponse.json({ error: "Erro ao excluir o grupo." }, { status: 500 });
+  }
 
   return NextResponse.json({ ok: true });
 }

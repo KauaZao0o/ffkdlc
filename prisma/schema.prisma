@@ -45,11 +45,15 @@ model Conversation {
 
 // Quem participa de qual conversa
 model ConversationMember {
-  id             String   @id @default(uuid())
-  userId         String   @map("user_id")
-  conversationId String   @map("conversation_id")
-  joinedAt       DateTime @default(now()) @map("joined_at")
-  isAdmin        Boolean  @default(false) @map("is_admin")
+  id             String    @id @default(uuid())
+  userId         String    @map("user_id")
+  conversationId String    @map("conversation_id")
+  joinedAt       DateTime  @default(now()) @map("joined_at")
+  isAdmin        Boolean   @default(false) @map("is_admin")
+
+  // quando não-nulo, a conversa fica escondida da lista desse usuário
+  // (equivalente ao "apagar para mim" do WhatsApp) até chegar mensagem nova
+  hiddenAt       DateTime? @map("hidden_at")
 
   user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)

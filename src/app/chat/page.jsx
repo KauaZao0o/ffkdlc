@@ -34,9 +34,11 @@ export default function ChatPage() {
     loadConversations();
   }
 
-  function handleGroupDeleted(deletedId) {
-    setConversations((prev) => prev.filter((c) => c.id !== deletedId));
-    setActiveConversation((prev) => (prev?.id === deletedId ? null : prev));
+  // Usado nos três casos: excluir grupo (admin), sair do grupo e apagar
+  // conversa só para mim - em todos, ela some da sua lista.
+  function removeConversationFromView(conversationId) {
+    setConversations((prev) => prev.filter((c) => c.id !== conversationId));
+    setActiveConversation((prev) => (prev?.id === conversationId ? null : prev));
   }
 
   if (loading || !user) return null;
@@ -50,9 +52,13 @@ export default function ChatPage() {
         onNewGroup={() => setShowGroupModal(true)}
       />
 
-      <ChatWindow conversation={activeConversation} />
+      <ChatWindow conversation={activeConversation} onHideConversation={removeConversationFromView} />
 
-      <ParticipantsList conversation={activeConversation} onGroupDeleted={handleGroupDeleted} />
+      <ParticipantsList
+        conversation={activeConversation}
+        onGroupDeleted={removeConversationFromView}
+        onLeftGroup={removeConversationFromView}
+      />
 
       {showGroupModal && (
         <CreateGroupModal onClose={() => setShowGroupModal(false)} onCreated={handleGroupCreated} />

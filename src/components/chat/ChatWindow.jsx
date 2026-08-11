@@ -6,7 +6,7 @@ import { getSupabaseBrowserClient } from "@/lib/supabaseClient";
 import MessageBubble from "./MessageBubble.jsx";
 import MessageInput from "./MessageInput.jsx";
 
-export default function ChatWindow({ conversation }) {
+export default function ChatWindow({ conversation, onHideConversation }) {
   const [messages, setMessages] = useState([]);
   const [typingUser, setTypingUser] = useState(null);
   const { user } = useAuth();
@@ -133,6 +133,25 @@ export default function ChatWindow({ conversation }) {
     }
   }
 
+  async function handleHideConversation() {
+    const confirmed = window.confirm(
+      `Apagar "${conversation.name}" só para você? Ela continua existindo para os outros participantes.`
+    );
+    if (!confirmed) return;
+
+    const res = await fetch(`/api/conversations/${conversation.id}/hide`, {
+      method: "POST",
+      credentials: "include",
+    });
+
+    if (res.ok) {
+      onHideConversation(conversation.id);
+    } else {
+      const data = await res.json();
+      alert(data.error || "Não foi possível apagar a conversa.");
+    }
+  }
+
   if (!conversation) {
     return (
       <div className="chat-main" style={{ alignItems: "center", justifyContent: "center", color: "#888" }}>
@@ -143,8 +162,20 @@ export default function ChatWindow({ conversation }) {
 
   return (
     <div className="chat-main">
-      <div style={{ padding: "12px 18px", borderBottom: "1px solid #e2e2e0", background: "white" }}>
+      <div
+        style={{
+          padding: "12px 18px",
+          borderBottom: "1px solid #e2e2e0",
+          background: "white",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+        }}
+      >
         <p style={{ margin: 0, fontWeight: 500 }}>{conversation.name}</p>
+        <button onClick={handleHideConversation} style={{ fontSize: 12 }} title="Apagar essa conversa só para você">
+          Apagar para mim
+        </button>
       </div>
 
       <div style={{ flex: 1, padding: 16, overflowY: "auto", display: "flex", flexDirection: "column", gap: 10 }}>
