@@ -130,6 +130,13 @@ chat-next/
 > o projeto, rode `npx prisma migrate dev` de novo antes de testar -
 > veja o Passo 2 mais abaixo.
 
+- **Som de notificação**: toca um "ding" curto quando chega mensagem de
+  qualquer conversa (mesmo as que não estão abertas na tela), gerado
+  direto no navegador via Web Audio API — não depende de nenhum arquivo
+  de áudio externo. O ícone de sino 🔔/🔕 no canto superior direito liga e
+  desliga, e a preferência fica salva no navegador (`localStorage`), então
+  não precisa configurar de novo a cada visita.
+
 ## Onde adicionar as funcionalidades futuras
 
 | Funcionalidade | Onde mexer |

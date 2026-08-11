@@ -1,8 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext.jsx";
+import { useSound } from "@/context/SoundContext.jsx";
+import { getSupabaseBrowserClient } from "@/lib/supabaseClient";
 import ConversationList from "@/components/sidebar/ConversationList.jsx";
 import ChatWindow from "@/components/chat/ChatWindow.jsx";
 import ParticipantsList from "@/components/group/ParticipantsList.jsx";
@@ -13,7 +15,13 @@ export default function ChatPage() {
   const [activeConversation, setActiveConversation] = useState(null);
   const [showGroupModal, setShowGroupModal] = useState(false);
   const { user, loading, logout } = useAuth();
+  const { enabled: soundEnabled, toggle: toggleSound, play: playSound } = useSound();
   const router = useRouter();
+  const activeConversationRef = useRef(null);
+
+  useEffect(() => {
+    activeConversationRef.current = activeConversation;
+  }, [activeConversation]);
 
   useEffect(() => {
     if (!loading && !user) router.replace("/login");
@@ -28,6 +36,33 @@ export default function ChatPage() {
   useEffect(() => {
     if (user) loadConversations();
   }, [user]);
+
+  // Toca o som de notificação para mensagens novas de QUALQUER conversa
+  // (não só a que está aberta na tela), simulando receber uma notificação
+  // em segundo plano. Um canal por conversa, todos escutando ao mesmo tempo.
+  useEffect(() => {
+    if (!user || conversations.length === 0) return;
+
+    const supabase = getSupabaseBrowserClient();
+    const channels = conversations.map((conv) =>
+      supabase
+        .channel(`notify-${conv.id}`)
+        .on(
+          "postgres_changes",
+          { event: "INSERT", schema: "public", table: "messages", filter: `conversation_id=eq.${conv.id}` },
+          (payload) => {
+            if (payload.new.sender_id === user.id) return;
+            playSound();
+          }
+        )
+        .subscribe()
+    );
+
+    return () => {
+      channels.forEach((c) => supabase.removeChannel(c));
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conversations, user]);
 
   function handleGroupCreated() {
     setShowGroupModal(false);
@@ -63,6 +98,14 @@ export default function ChatPage() {
       {showGroupModal && (
         <CreateGroupModal onClose={() => setShowGroupModal(false)} onCreated={handleGroupCreated} />
       )}
+
+      <button
+        onClick={toggleSound}
+        title={soundEnabled ? "Desativar som de notificação" : "Ativar som de notificação"}
+        style={{ position: "absolute", top: 10, right: 70, fontSize: 16, padding: "4px 10px" }}
+      >
+        {soundEnabled ? "🔔" : "🔕"}
+      </button>
 
       <button
         onClick={async () => {
