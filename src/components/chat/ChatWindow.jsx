@@ -182,7 +182,7 @@ export default function ChatWindow({ conversation, onHideConversation }) {
         </button>
       </div>
 
-      <div style={{ flex: 1, padding: 16, overflowY: "auto", display: "flex", flexDirection: "column", gap: 10 }}>
+      <div style={{ flex: 1, minWidth: 0, padding: 16, overflowY: "auto", overflowX: "hidden", display: "flex", flexDirection: "column", gap: 10 }}>
         {messages.map((m) => (
           <MessageBubble
             key={m.id}

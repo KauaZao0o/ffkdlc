@@ -10,7 +10,13 @@ export default function MessageBubble({ message, isOwn, onDelete }) {
     <div
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
-      style={{ display: "flex", flexDirection: "column", alignItems: isOwn ? "flex-end" : "flex-start" }}
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        alignItems: isOwn ? "flex-end" : "flex-start",
+        minWidth: 0,
+        maxWidth: "100%",
+      }}
     >
       {!isOwn && (
         <span style={{ fontSize: 11, color: "#888", marginBottom: 2 }}>{message.sender?.username}</span>
@@ -33,7 +39,7 @@ export default function MessageBubble({ message, isOwn, onDelete }) {
             <img
               src={message.fileUrl}
               alt="Imagem enviada no chat"
-              style={{ maxWidth: 220, maxHeight: 220, borderRadius: 8, display: "block" }}
+              style={{ maxWidth: "100%", width: 220, maxHeight: 260, borderRadius: 8, display: "block", objectFit: "cover" }}
             />
           ) : (
             message.content
