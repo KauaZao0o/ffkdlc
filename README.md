@@ -137,6 +137,38 @@ chat-next/
   desliga, e a preferência fica salva no navegador (`localStorage`), então
   não precisa configurar de novo a cada visita.
 
+- **Som de notificação, agora mais confiável**: além do Realtime, o app
+  também confere a cada 5 segundos se a última mensagem de alguma
+  conversa mudou (mesma lógica de segurança usada pras mensagens em si) -
+  então o som toca mesmo se o Realtime não estiver entregando o evento.
+- **Enviar fotos**: botão 📷 ao lado do campo de mensagem. A imagem é
+  enviada direto do navegador para o **Supabase Storage** (gratuito) e a
+  URL fica salva na mensagem. Requer configurar um bucket - veja o Passo 6
+  abaixo.
+
+## Passo 6 — Ativar o envio de fotos (Supabase Storage)
+
+1. No painel do Supabase, vá em **Storage** (menu lateral) → **New bucket**.
+2. Nome: `chat-files`. Marque a opção **Public bucket**. Crie.
+3. Vá em **SQL Editor** e rode isto, para permitir que qualquer usuário
+   logado envie e visualize as imagens:
+
+```sql
+create policy "Public read chat files"
+on storage.objects for select
+to public
+using (bucket_id = 'chat-files');
+
+create policy "Anyone can upload chat files"
+on storage.objects for insert
+to anon, authenticated
+with check (bucket_id = 'chat-files');
+```
+
+> Assim como a política de leitura da tabela `messages`, isso deixa o
+> bucket de imagens acessível por qualquer pessoa com a `anon key` (que já
+> é pública). Para um projeto pessoal tudo bem, mas vale saber que existe.
+
 ## Onde adicionar as funcionalidades futuras
 
 | Funcionalidade | Onde mexer |

@@ -4,6 +4,7 @@ import { useState } from "react";
 
 export default function MessageBubble({ message, isOwn, onDelete }) {
   const [hover, setHover] = useState(false);
+  const isImage = message.type === "image" && message.fileUrl;
 
   return (
     <div
@@ -19,7 +20,7 @@ export default function MessageBubble({ message, isOwn, onDelete }) {
           style={{
             background: isOwn ? "#185fa5" : "#f0f0ee",
             color: isOwn ? "white" : "#1c1c1a",
-            padding: "8px 12px",
+            padding: isImage ? 4 : "8px 12px",
             borderRadius: 12,
             maxWidth: "70%",
             fontSize: 14,
@@ -28,7 +29,15 @@ export default function MessageBubble({ message, isOwn, onDelete }) {
             whiteSpace: "pre-wrap",
           }}
         >
-          {message.content}
+          {isImage ? (
+            <img
+              src={message.fileUrl}
+              alt="Imagem enviada no chat"
+              style={{ maxWidth: 220, maxHeight: 220, borderRadius: 8, display: "block" }}
+            />
+          ) : (
+            message.content
+          )}
         </div>
         {isOwn && hover && (
           <button

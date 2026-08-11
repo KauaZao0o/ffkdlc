@@ -23,13 +23,18 @@ export async function POST(request, { params }) {
   const userId = getUserIdFromRequest(request);
   if (!userId) return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
 
-  const { content } = await request.json();
-  if (!content || !content.trim()) {
+  const { content, type = "text", fileUrl } = await request.json();
+
+  if (type === "image") {
+    if (!fileUrl) {
+      return NextResponse.json({ error: "Imagem inválida." }, { status: 400 });
+    }
+  } else if (!content || !content.trim()) {
     return NextResponse.json({ error: "Mensagem vazia." }, { status: 400 });
   }
 
   const message = await prisma.message.create({
-    data: { content, conversationId: params.id, senderId: userId },
+    data: { content: content || "", conversationId: params.id, senderId: userId, type, fileUrl },
     include: { sender: { select: { id: true, username: true, avatarColor: true } } },
   });
 

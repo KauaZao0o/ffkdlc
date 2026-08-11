@@ -17,29 +17,61 @@ export default function ChatPage() {
   const { user, loading, logout } = useAuth();
   const { enabled: soundEnabled, toggle: toggleSound, play: playSound } = useSound();
   const router = useRouter();
-  const activeConversationRef = useRef(null);
 
-  useEffect(() => {
-    activeConversationRef.current = activeConversation;
-  }, [activeConversation]);
+  // Evita tocar o som duas vezes para a mesma mensagem (uma vez pelo
+  // Realtime, outra pelo polling de segurança abaixo).
+  const notifiedIdsRef = useRef(new Set());
+  const lastMessageIdsRef = useRef({});
+
+  function notifyIfNew(message) {
+    if (!message || !user || message.senderId === user.id) return;
+    if (notifiedIdsRef.current.has(message.id)) return;
+    notifiedIdsRef.current.add(message.id);
+    playSound();
+  }
 
   useEffect(() => {
     if (!loading && !user) router.replace("/login");
   }, [loading, user, router]);
 
-  function loadConversations() {
-    fetch("/api/conversations", { credentials: "include" })
-      .then((res) => res.json())
-      .then(setConversations);
-  }
-
+  // Busca a lista de conversas e, ao mesmo tempo, serve como rede de
+  // segurança para o som: se a última mensagem de alguma conversa mudou
+  // desde a última checagem, toca a notificação - isso funciona mesmo se
+  // o Realtime (abaixo) não estiver entregando os eventos por algum
+  // motivo (RLS, rede, etc), do mesmo jeito que já garantimos para as
+  // mensagens dentro da conversa aberta.
   useEffect(() => {
-    if (user) loadConversations();
+    if (!user) return;
+
+    function poll() {
+      fetch("/api/conversations", { credentials: "include" })
+        .then((res) => res.json())
+        .then((fresh) => {
+          if (!Array.isArray(fresh)) return;
+
+          fresh.forEach((conv) => {
+            const last = conv.lastMessage;
+            const previousId = lastMessageIdsRef.current[conv.id];
+
+            if (last && previousId !== undefined && previousId !== last.id) {
+              notifyIfNew(last);
+            }
+            if (last) lastMessageIdsRef.current[conv.id] = last.id;
+          });
+
+          setConversations(fresh);
+        })
+        .catch(() => {});
+    }
+
+    poll();
+    const interval = setInterval(poll, 5000);
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
-  // Toca o som de notificação para mensagens novas de QUALQUER conversa
-  // (não só a que está aberta na tela), simulando receber uma notificação
-  // em segundo plano. Um canal por conversa, todos escutando ao mesmo tempo.
+  // Caminho rápido: quando o Realtime está funcionando, o som toca quase
+  // instantaneamente em vez de esperar o próximo polling (até 5s).
   useEffect(() => {
     if (!user || conversations.length === 0) return;
 
@@ -51,8 +83,7 @@ export default function ChatPage() {
           "postgres_changes",
           { event: "INSERT", schema: "public", table: "messages", filter: `conversation_id=eq.${conv.id}` },
           (payload) => {
-            if (payload.new.sender_id === user.id) return;
-            playSound();
+            notifyIfNew({ id: payload.new.id, senderId: payload.new.sender_id });
           }
         )
         .subscribe()
@@ -65,8 +96,10 @@ export default function ChatPage() {
   }, [conversations, user]);
 
   function handleGroupCreated() {
+    fetch("/api/conversations", { credentials: "include" })
+      .then((res) => res.json())
+      .then(setConversations);
     setShowGroupModal(false);
-    loadConversations();
   }
 
   // Usado nos três casos: excluir grupo (admin), sair do grupo e apagar

@@ -74,6 +74,8 @@ export default function ChatWindow({ conversation, onHideConversation }) {
                 createdAt: row.created_at,
                 senderId: row.sender_id,
                 conversationId: row.conversation_id,
+                type: row.type,
+                fileUrl: row.file_url,
                 sender,
               },
             ];
@@ -105,16 +107,18 @@ export default function ChatWindow({ conversation, onHideConversation }) {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  async function handleSend(content) {
+  async function handleSend({ content, type = "text", fileUrl }) {
     const res = await fetch(`/api/conversations/${conversation.id}/messages`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
-      body: JSON.stringify({ content }),
+      body: JSON.stringify({ content, type, fileUrl }),
     });
     const message = await res.json();
     if (res.ok) {
       setMessages((prev) => (prev.some((m) => m.id === message.id) ? prev : [...prev, message]));
+    } else {
+      alert(message.error || "Não foi possível enviar.");
     }
   }
 
@@ -191,7 +195,7 @@ export default function ChatWindow({ conversation, onHideConversation }) {
         <div ref={bottomRef} />
       </div>
 
-      <MessageInput channelRef={channelRef} userId={user.id} onSend={handleSend} />
+      <MessageInput channelRef={channelRef} userId={user.id} conversationId={conversation.id} onSend={handleSend} />
     </div>
   );
 }
