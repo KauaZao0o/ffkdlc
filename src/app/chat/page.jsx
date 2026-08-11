@@ -34,6 +34,11 @@ export default function ChatPage() {
     loadConversations();
   }
 
+  function handleGroupDeleted(deletedId) {
+    setConversations((prev) => prev.filter((c) => c.id !== deletedId));
+    setActiveConversation((prev) => (prev?.id === deletedId ? null : prev));
+  }
+
   if (loading || !user) return null;
 
   return (
@@ -47,7 +52,7 @@ export default function ChatPage() {
 
       <ChatWindow conversation={activeConversation} />
 
-      <ParticipantsList conversation={activeConversation} />
+      <ParticipantsList conversation={activeConversation} onGroupDeleted={handleGroupDeleted} />
 
       {showGroupModal && (
         <CreateGroupModal onClose={() => setShowGroupModal(false)} onCreated={handleGroupCreated} />

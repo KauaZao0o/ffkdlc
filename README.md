@@ -106,6 +106,21 @@ chat-next/
 │       └── supabaseClient.js   # cliente Supabase (só Realtime, no navegador)
 ```
 
+## Novidades desta versão
+
+- **Rede de segurança para o tempo real**: além do Supabase Realtime (que
+  entrega mensagens instantaneamente), o `ChatWindow` agora também busca o
+  histórico atualizado a cada 4 segundos em segundo plano. Isso garante
+  que, mesmo se o Realtime falhar por algum motivo (RLS mal configurado,
+  rede, etc), as mensagens continuam chegando sem precisar dar refresh.
+- **Apagar mensagem**: passe o mouse sobre uma mensagem sua para ver o
+  ícone de lixeira. Só quem escreveu a mensagem pode apagá-la
+  (`DELETE /api/conversations/[id]/messages/[messageId]`).
+- **Apagar grupo**: o participante marcado como administrador (quem criou
+  o grupo) vê um botão "Excluir grupo" no painel de participantes. Isso
+  apaga o grupo e, em cascata, todas as mensagens e participações ligadas
+  a ele (`DELETE /api/conversations/[id]`).
+
 ## Onde adicionar as funcionalidades futuras
 
 | Funcionalidade | Onde mexer |

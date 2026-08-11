@@ -14,6 +14,16 @@ export default function ChatWindow({ conversation }) {
   const channelRef = useRef(null);
   const participantsMapRef = useRef({});
 
+  function fetchMessages() {
+    if (!conversation) return;
+    fetch(`/api/conversations/${conversation.id}/messages`, { credentials: "include" })
+      .then((res) => res.json())
+      .then((fresh) => {
+        if (Array.isArray(fresh)) setMessages(fresh);
+      })
+      .catch(() => {});
+  }
+
   // Carrega histórico + participantes e assina o canal em tempo real
   // sempre que a conversa selecionada muda.
   useEffect(() => {
@@ -78,10 +88,17 @@ export default function ChatWindow({ conversation }) {
 
     channelRef.current = channel;
 
+    // Rede de segurança: mesmo se o Realtime falhar (RLS mal configurado,
+    // rede instável, etc), essa atualização periódica garante que as
+    // mensagens (e exclusões) cheguem sem precisar dar refresh manual.
+    const pollInterval = setInterval(fetchMessages, 4000);
+
     return () => {
       cancelled = true;
       supabase.removeChannel(channel);
+      clearInterval(pollInterval);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversation, user]);
 
   useEffect(() => {
@@ -101,6 +118,21 @@ export default function ChatWindow({ conversation }) {
     }
   }
 
+  async function handleDeleteMessage(messageId) {
+    const previous = messages;
+    setMessages((prev) => prev.filter((m) => m.id !== messageId));
+
+    const res = await fetch(`/api/conversations/${conversation.id}/messages/${messageId}`, {
+      method: "DELETE",
+      credentials: "include",
+    });
+
+    if (!res.ok) {
+      // Se der erro no servidor, volta a mensagem pra tela.
+      setMessages(previous);
+    }
+  }
+
   if (!conversation) {
     return (
       <div className="chat-main" style={{ alignItems: "center", justifyContent: "center", color: "#888" }}>
@@ -117,7 +149,12 @@ export default function ChatWindow({ conversation }) {
 
       <div style={{ flex: 1, padding: 16, overflowY: "auto", display: "flex", flexDirection: "column", gap: 10 }}>
         {messages.map((m) => (
-          <MessageBubble key={m.id} message={m} isOwn={m.senderId === user.id} />
+          <MessageBubble
+            key={m.id}
+            message={m}
+            isOwn={m.senderId === user.id}
+            onDelete={handleDeleteMessage}
+          />
         ))}
         {typingUser && <p style={{ fontSize: 13, color: "#888", margin: 0 }}>digitando...</p>}
         <div ref={bottomRef} />
