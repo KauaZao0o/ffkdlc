@@ -14,12 +14,13 @@ export default function ChatPage() {
   const [conversations, setConversations] = useState([]);
   const [activeConversation, setActiveConversation] = useState(null);
   const [showGroupModal, setShowGroupModal] = useState(false);
+  const [showParticipantsDrawer, setShowParticipantsDrawer] = useState(false);
+  // No celular, alterna entre ver a lista de conversas e ver o chat aberto.
+  const [mobileView, setMobileView] = useState("list");
   const { user, loading, logout } = useAuth();
   const { enabled: soundEnabled, toggle: toggleSound, play: playSound } = useSound();
   const router = useRouter();
 
-  // Evita tocar o som duas vezes para a mesma mensagem (uma vez pelo
-  // Realtime, outra pelo polling de segurança abaixo).
   const notifiedIdsRef = useRef(new Set());
   const lastMessageIdsRef = useRef({});
 
@@ -34,12 +35,6 @@ export default function ChatPage() {
     if (!loading && !user) router.replace("/login");
   }, [loading, user, router]);
 
-  // Busca a lista de conversas e, ao mesmo tempo, serve como rede de
-  // segurança para o som: se a última mensagem de alguma conversa mudou
-  // desde a última checagem, toca a notificação - isso funciona mesmo se
-  // o Realtime (abaixo) não estiver entregando os eventos por algum
-  // motivo (RLS, rede, etc), do mesmo jeito que já garantimos para as
-  // mensagens dentro da conversa aberta.
   useEffect(() => {
     if (!user) return;
 
@@ -70,8 +65,6 @@ export default function ChatPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
-  // Caminho rápido: quando o Realtime está funcionando, o som toca quase
-  // instantaneamente em vez de esperar o próximo polling (até 5s).
   useEffect(() => {
     if (!user || conversations.length === 0) return;
 
@@ -95,6 +88,11 @@ export default function ChatPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversations, user]);
 
+  function handleSelectConversation(conversation) {
+    setActiveConversation(conversation);
+    setMobileView("chat");
+  }
+
   function handleGroupCreated() {
     fetch("/api/conversations", { credentials: "include" })
       .then((res) => res.json())
@@ -107,49 +105,75 @@ export default function ChatPage() {
   function removeConversationFromView(conversationId) {
     setConversations((prev) => prev.filter((c) => c.id !== conversationId));
     setActiveConversation((prev) => (prev?.id === conversationId ? null : prev));
+    setMobileView("list");
+    setShowParticipantsDrawer(false);
   }
 
   if (loading || !user) return null;
 
   return (
-    <div className="app-layout">
-      <ConversationList
-        conversations={conversations}
-        activeId={activeConversation?.id}
-        onSelect={setActiveConversation}
-        onNewGroup={() => setShowGroupModal(true)}
-      />
+    <div className="app-shell">
+      <div className="top-bar">
+        <p className="top-bar-title">{activeConversation?.name || "Chat"}</p>
+        <div className="top-bar-actions">
+          <button
+            className="icon-button"
+            onClick={toggleSound}
+            title={soundEnabled ? "Desativar som de notificação" : "Ativar som de notificação"}
+          >
+            {soundEnabled ? "🔔" : "🔕"}
+          </button>
+          <button
+            onClick={async () => {
+              await logout();
+              router.replace("/login");
+            }}
+            title={`Sair (${user.username})`}
+          >
+            Sair
+          </button>
+        </div>
+      </div>
 
-      <ChatWindow conversation={activeConversation} onHideConversation={removeConversationFromView} />
+      <div className={`app-layout ${mobileView === "chat" ? "mobile-show-chat" : ""}`}>
+        <ConversationList
+          conversations={conversations}
+          activeId={activeConversation?.id}
+          onSelect={handleSelectConversation}
+          onNewGroup={() => setShowGroupModal(true)}
+        />
 
-      <ParticipantsList
-        conversation={activeConversation}
-        onGroupDeleted={removeConversationFromView}
-        onLeftGroup={removeConversationFromView}
-      />
+        <ChatWindow
+          conversation={activeConversation}
+          onHideConversation={removeConversationFromView}
+          onBack={() => setMobileView("list")}
+          onOpenParticipants={() => setShowParticipantsDrawer(true)}
+        />
+
+        <ParticipantsList
+          conversation={activeConversation}
+          onGroupDeleted={removeConversationFromView}
+          onLeftGroup={removeConversationFromView}
+        />
+      </div>
+
+      {showParticipantsDrawer && activeConversation?.isGroup && (
+        <div className="drawer-overlay" onClick={() => setShowParticipantsDrawer(false)}>
+          <div className="drawer-panel" onClick={(e) => e.stopPropagation()}>
+            <ParticipantsList
+              conversation={activeConversation}
+              onGroupDeleted={removeConversationFromView}
+              onLeftGroup={removeConversationFromView}
+              variant="drawer"
+              onClose={() => setShowParticipantsDrawer(false)}
+            />
+          </div>
+        </div>
+      )}
 
       {showGroupModal && (
         <CreateGroupModal onClose={() => setShowGroupModal(false)} onCreated={handleGroupCreated} />
       )}
-
-      <button
-        onClick={toggleSound}
-        title={soundEnabled ? "Desativar som de notificação" : "Ativar som de notificação"}
-        style={{ position: "absolute", top: 10, right: 70, fontSize: 16, padding: "4px 10px" }}
-      >
-        {soundEnabled ? "🔔" : "🔕"}
-      </button>
-
-      <button
-        onClick={async () => {
-          await logout();
-          router.replace("/login");
-        }}
-        style={{ position: "absolute", top: 10, right: 10, fontSize: 12 }}
-        title={`Sair (${user.username})`}
-      >
-        Sair
-      </button>
     </div>
   );
 }

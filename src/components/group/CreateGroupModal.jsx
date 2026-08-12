@@ -41,7 +41,7 @@ export default function CreateGroupModal({ onClose, onCreated }) {
         zIndex: 10,
       }}
     >
-      <div style={{ background: "white", borderRadius: 12, padding: 24, width: 320 }}>
+      <div style={{ background: "white", borderRadius: 12, padding: 24, width: 320, maxWidth: "85vw" }}>
         <h3 style={{ marginTop: 0 }}>Criar grupo</h3>
         <input
           placeholder="Nome do grupo"

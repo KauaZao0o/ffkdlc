@@ -47,7 +47,7 @@ export default function AddParticipantsModal({ conversation, currentParticipantI
         zIndex: 10,
       }}
     >
-      <div style={{ background: "white", borderRadius: 12, padding: 24, width: 320 }}>
+      <div style={{ background: "white", borderRadius: 12, padding: 24, width: 320, maxWidth: "85vw" }}>
         <h3 style={{ marginTop: 0 }}>Adicionar participantes</h3>
         <p style={{ fontSize: 13, color: "#777", marginBottom: 6 }}>Escolha quem entrar no grupo "{conversation.name}"</p>
         <div style={{ maxHeight: 200, overflowY: "auto", marginBottom: 16 }}>

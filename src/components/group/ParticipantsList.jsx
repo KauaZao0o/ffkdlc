@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext.jsx";
 import AddParticipantsModal from "./AddParticipantsModal.jsx";
 
-export default function ParticipantsList({ conversation, onGroupDeleted, onLeftGroup }) {
+export default function ParticipantsList({ conversation, onGroupDeleted, onLeftGroup, variant = "panel", onClose }) {
   const [participants, setParticipants] = useState([]);
   const [showAddModal, setShowAddModal] = useState(false);
   const { user } = useAuth();
@@ -70,12 +70,22 @@ export default function ParticipantsList({ conversation, onGroupDeleted, onLeftG
   }
 
   return (
-    <div className="participants-panel" style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+    <div
+      className={variant === "panel" ? "participants-panel" : ""}
+      style={{ display: "flex", flexDirection: "column", height: "100%" }}
+    >
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
         <p style={{ fontSize: 13, fontWeight: 500, color: "#777", margin: 0 }}>Participantes</p>
-        <button onClick={() => setShowAddModal(true)} style={{ fontSize: 12, padding: "2px 8px" }} title="Adicionar participante">
-          + Add
-        </button>
+        <div style={{ display: "flex", gap: 6 }}>
+          <button onClick={() => setShowAddModal(true)} style={{ fontSize: 12, padding: "2px 8px" }} title="Adicionar participante">
+            + Add
+          </button>
+          {variant === "drawer" && (
+            <button onClick={onClose} style={{ fontSize: 12, padding: "2px 8px" }} title="Fechar">
+              ✕
+            </button>
+          )}
+        </div>
       </div>
       <div style={{ flex: 1 }}>
         {participants.map((p) => (

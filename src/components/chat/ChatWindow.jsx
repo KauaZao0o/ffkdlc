@@ -8,7 +8,7 @@ import MessageInput from "./MessageInput.jsx";
 
 const NEAR_BOTTOM_THRESHOLD = 100;
 
-export default function ChatWindow({ conversation, onHideConversation }) {
+export default function ChatWindow({ conversation, onHideConversation, onBack, onOpenParticipants }) {
   const [messages, setMessages] = useState([]);
   const [typingUser, setTypingUser] = useState(null);
   const [showJumpButton, setShowJumpButton] = useState(false);
@@ -212,12 +212,35 @@ export default function ChatWindow({ conversation, onHideConversation }) {
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
+          gap: 8,
         }}
       >
-        <p style={{ margin: 0, fontWeight: 500 }}>{conversation.name}</p>
-        <button onClick={handleHideConversation} style={{ fontSize: 12 }} title="Apagar essa conversa só para você">
-          Apagar para mim
-        </button>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+          <button className="icon-button mobile-only" onClick={onBack} title="Voltar para as conversas">
+            ←
+          </button>
+          <p
+            style={{
+              margin: 0,
+              fontWeight: 500,
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+            }}
+          >
+            {conversation.name}
+          </p>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+          {conversation.isGroup && (
+            <button className="icon-button mobile-only" onClick={onOpenParticipants} title="Ver participantes">
+              👥
+            </button>
+          )}
+          <button onClick={handleHideConversation} style={{ fontSize: 12 }} title="Apagar essa conversa só para você">
+            Apagar para mim
+          </button>
+        </div>
       </div>
 
       <div style={{ flex: 1, minWidth: 0, position: "relative" }}>
