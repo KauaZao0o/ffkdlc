@@ -124,6 +124,11 @@ button:disabled {
   background: white;
 }
 
+.hide-conversation-btn {
+  font-size: 12px;
+  white-space: nowrap;
+}
+
 .mobile-only {
   display: none;
 }
@@ -165,6 +170,15 @@ button:disabled {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  .hide-conversation-btn {
+    font-size: 0;
+    padding: 8px 10px;
+  }
+  .hide-conversation-btn::before {
+    content: "🗑";
+    font-size: 15px;
   }
 
   /* Por padrão mostra a lista de conversas ocupando a tela toda */

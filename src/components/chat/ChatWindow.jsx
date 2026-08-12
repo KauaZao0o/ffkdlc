@@ -237,7 +237,7 @@ export default function ChatWindow({ conversation, onHideConversation, onBack, o
               👥
             </button>
           )}
-          <button onClick={handleHideConversation} style={{ fontSize: 12 }} title="Apagar essa conversa só para você">
+          <button className="hide-conversation-btn" onClick={handleHideConversation} title="Apagar essa conversa só para você">
             Apagar para mim
           </button>
         </div>

@@ -35,11 +35,7 @@ export default function MessageInput({ channelRef, userId, conversationId, onSen
     sendTyping(false);
   }
 
-  async function handleFileSelected(e) {
-    const file = e.target.files?.[0];
-    e.target.value = ""; // permite escolher o mesmo arquivo de novo depois
-    if (!file) return;
-
+  async function sendImageFile(file) {
     if (!file.type.startsWith("image/")) {
       alert("Por enquanto só é possível enviar imagens.");
       return;
@@ -58,6 +54,30 @@ export default function MessageInput({ channelRef, userId, conversationId, onSen
       alert("Não foi possível enviar a imagem. Confira se o bucket 'chat-files' existe no Supabase.");
     } finally {
       setUploading(false);
+    }
+  }
+
+  async function handleFileSelected(e) {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // permite escolher o mesmo arquivo de novo depois
+    if (file) await sendImageFile(file);
+  }
+
+  // Permite colar uma imagem copiada (print, ou copiada de outro site)
+  // direto no campo de mensagem com Ctrl+V / Cmd+V.
+  function handlePaste(e) {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+
+    for (const item of items) {
+      if (item.type.startsWith("image/")) {
+        const file = item.getAsFile();
+        if (file) {
+          e.preventDefault();
+          sendImageFile(file);
+        }
+        break;
+      }
     }
   }
 
@@ -88,8 +108,18 @@ export default function MessageInput({ channelRef, userId, conversationId, onSen
       >
         {uploading ? "..." : "📷"}
       </button>
-      <input type="text" placeholder="Digite uma mensagem" value={text} onChange={handleChange} style={{ flex: 1 }} />
-      <button type="submit" className="primary">Enviar</button>
+      <input
+        type="text"
+        placeholder={uploading ? "Enviando imagem..." : "Digite uma mensagem (ou cole uma imagem aqui)"}
+        value={text}
+        onChange={handleChange}
+        onPaste={handlePaste}
+        disabled={uploading}
+        style={{ flex: 1 }}
+      />
+      <button type="submit" className="primary" disabled={uploading}>
+        Enviar
+      </button>
     </form>
   );
 }
