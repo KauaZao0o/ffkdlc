@@ -6,13 +6,33 @@ import { getSupabaseBrowserClient } from "@/lib/supabaseClient";
 import MessageBubble from "./MessageBubble.jsx";
 import MessageInput from "./MessageInput.jsx";
 
+const NEAR_BOTTOM_THRESHOLD = 100;
+
 export default function ChatWindow({ conversation, onHideConversation }) {
   const [messages, setMessages] = useState([]);
   const [typingUser, setTypingUser] = useState(null);
+  const [showJumpButton, setShowJumpButton] = useState(false);
   const { user } = useAuth();
   const bottomRef = useRef(null);
+  const scrollContainerRef = useRef(null);
   const channelRef = useRef(null);
   const participantsMapRef = useRef({});
+  const isAtBottomRef = useRef(true);
+  const lastMessageIdRef = useRef(null);
+
+  function scrollToBottom(behavior = "smooth") {
+    bottomRef.current?.scrollIntoView({ behavior });
+    isAtBottomRef.current = true;
+    setShowJumpButton(false);
+  }
+
+  function handleScroll() {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < NEAR_BOTTOM_THRESHOLD;
+    isAtBottomRef.current = nearBottom;
+    setShowJumpButton(!nearBottom);
+  }
 
   function fetchMessages() {
     if (!conversation) return;
@@ -49,7 +69,11 @@ export default function ChatWindow({ conversation, onHideConversation }) {
       map[user.id] = { username: user.username, avatarColor: user.avatarColor };
       participantsMapRef.current = map;
 
+      lastMessageIdRef.current = history[history.length - 1]?.id ?? null;
       setMessages(history);
+
+      // Ao abrir a conversa, sempre começa lá embaixo, na mensagem mais recente.
+      requestAnimationFrame(() => scrollToBottom("auto"));
     }
 
     setup();
@@ -103,8 +127,20 @@ export default function ChatWindow({ conversation, onHideConversation }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversation, user]);
 
+  // Só desce a tela sozinho quando: (a) chegou mensagem realmente nova
+  // (não é só o polling repetindo a mesma lista) E (b) você já estava
+  // olhando as mensagens mais recentes. Se você rolou pra cima de
+  // propósito pra ler o histórico, ele não te puxa mais pra baixo.
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    const lastMessage = messages[messages.length - 1];
+    const isNewMessage = lastMessage && lastMessage.id !== lastMessageIdRef.current;
+    lastMessageIdRef.current = lastMessage?.id ?? null;
+
+    if (isNewMessage && isAtBottomRef.current) {
+      scrollToBottom("smooth");
+    } else if (isNewMessage) {
+      setShowJumpButton(true);
+    }
   }, [messages]);
 
   async function handleSend({ content, type = "text", fileUrl }) {
@@ -117,6 +153,8 @@ export default function ChatWindow({ conversation, onHideConversation }) {
     const message = await res.json();
     if (res.ok) {
       setMessages((prev) => (prev.some((m) => m.id === message.id) ? prev : [...prev, message]));
+      // Ao enviar você mesmo, sempre desce pra ver sua própria mensagem.
+      isAtBottomRef.current = true;
     } else {
       alert(message.error || "Não foi possível enviar.");
     }
@@ -182,17 +220,45 @@ export default function ChatWindow({ conversation, onHideConversation }) {
         </button>
       </div>
 
-      <div style={{ flex: 1, minWidth: 0, padding: 16, overflowY: "auto", overflowX: "hidden", display: "flex", flexDirection: "column", gap: 10 }}>
-        {messages.map((m) => (
-          <MessageBubble
-            key={m.id}
-            message={m}
-            isOwn={m.senderId === user.id}
-            onDelete={handleDeleteMessage}
-          />
-        ))}
-        {typingUser && <p style={{ fontSize: 13, color: "#888", margin: 0 }}>digitando...</p>}
-        <div ref={bottomRef} />
+      <div style={{ flex: 1, minWidth: 0, position: "relative" }}>
+        <div
+          ref={scrollContainerRef}
+          onScroll={handleScroll}
+          style={{
+            position: "absolute",
+            inset: 0,
+            padding: 16,
+            overflowY: "auto",
+            overflowX: "hidden",
+            display: "flex",
+            flexDirection: "column",
+            gap: 10,
+          }}
+        >
+          {messages.map((m) => (
+            <MessageBubble key={m.id} message={m} isOwn={m.senderId === user.id} onDelete={handleDeleteMessage} />
+          ))}
+          {typingUser && <p style={{ fontSize: 13, color: "#888", margin: 0 }}>digitando...</p>}
+          <div ref={bottomRef} />
+        </div>
+
+        {showJumpButton && (
+          <button
+            onClick={() => scrollToBottom("smooth")}
+            className="primary"
+            style={{
+              position: "absolute",
+              bottom: 16,
+              left: "50%",
+              transform: "translateX(-50%)",
+              borderRadius: 20,
+              fontSize: 13,
+              boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
+            }}
+          >
+            ↓ Novas mensagens
+          </button>
+        )}
       </div>
 
       <MessageInput channelRef={channelRef} userId={user.id} conversationId={conversation.id} onSend={handleSend} />

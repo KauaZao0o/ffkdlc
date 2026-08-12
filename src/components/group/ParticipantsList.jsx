@@ -2,20 +2,26 @@
 
 import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext.jsx";
+import AddParticipantsModal from "./AddParticipantsModal.jsx";
 
 export default function ParticipantsList({ conversation, onGroupDeleted, onLeftGroup }) {
   const [participants, setParticipants] = useState([]);
+  const [showAddModal, setShowAddModal] = useState(false);
   const { user } = useAuth();
 
-  useEffect(() => {
+  function loadParticipants() {
     if (!conversation?.isGroup) {
       setParticipants([]);
       return;
     }
-
     fetch(`/api/conversations/${conversation.id}/participants`, { credentials: "include" })
       .then((res) => res.json())
       .then(setParticipants);
+  }
+
+  useEffect(() => {
+    loadParticipants();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversation]);
 
   if (!conversation?.isGroup) return null;
@@ -58,9 +64,19 @@ export default function ParticipantsList({ conversation, onGroupDeleted, onLeftG
     }
   }
 
+  function handleParticipantsAdded() {
+    setShowAddModal(false);
+    loadParticipants();
+  }
+
   return (
     <div className="participants-panel" style={{ display: "flex", flexDirection: "column", height: "100%" }}>
-      <p style={{ fontSize: 13, fontWeight: 500, color: "#777", margin: "0 0 12px" }}>Participantes</p>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+        <p style={{ fontSize: 13, fontWeight: 500, color: "#777", margin: 0 }}>Participantes</p>
+        <button onClick={() => setShowAddModal(true)} style={{ fontSize: 12, padding: "2px 8px" }} title="Adicionar participante">
+          + Add
+        </button>
+      </div>
       <div style={{ flex: 1 }}>
         {participants.map((p) => (
           <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
@@ -98,6 +114,15 @@ export default function ParticipantsList({ conversation, onGroupDeleted, onLeftG
           </button>
         )}
       </div>
+
+      {showAddModal && (
+        <AddParticipantsModal
+          conversation={conversation}
+          currentParticipantIds={participants.map((p) => p.id)}
+          onClose={() => setShowAddModal(false)}
+          onAdded={handleParticipantsAdded}
+        />
+      )}
     </div>
   );
 }

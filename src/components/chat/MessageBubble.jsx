@@ -13,9 +13,14 @@ export default function MessageBubble({ message, isOwn, onDelete }) {
       style={{
         display: "flex",
         flexDirection: "column",
-        alignItems: isOwn ? "flex-end" : "flex-start",
+        // O maxWidth fica aqui, no wrapper de fora - ele é filho direto do
+        // container de mensagens, que tem uma largura de verdade. Dentro de
+        // um flex row sem largura própria (como era antes), a porcentagem
+        // não tem referência confiável e pode "colapsar" pra quase zero,
+        // fazendo cada letra quebrar numa linha.
+        alignSelf: isOwn ? "flex-end" : "flex-start",
+        maxWidth: "70%",
         minWidth: 0,
-        maxWidth: "100%",
       }}
     >
       {!isOwn && (
@@ -28,10 +33,9 @@ export default function MessageBubble({ message, isOwn, onDelete }) {
             color: isOwn ? "white" : "#1c1c1a",
             padding: isImage ? 4 : "8px 12px",
             borderRadius: 12,
-            maxWidth: "70%",
+            minWidth: 0,
             fontSize: 14,
-            wordBreak: "break-word",
-            overflowWrap: "anywhere",
+            overflowWrap: "break-word",
             whiteSpace: "pre-wrap",
           }}
         >
@@ -56,6 +60,7 @@ export default function MessageBubble({ message, isOwn, onDelete }) {
               fontSize: 14,
               padding: 2,
               cursor: "pointer",
+              flexShrink: 0,
             }}
           >
             🗑
