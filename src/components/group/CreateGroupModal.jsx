@@ -41,7 +41,7 @@ export default function CreateGroupModal({ onClose, onCreated }) {
         zIndex: 10,
       }}
     >
-      <div style={{ background: "white", borderRadius: 12, padding: 24, width: 320, maxWidth: "85vw" }}>
+      <div style={{ background: "var(--surface)", color: "var(--text)", borderRadius: 12, padding: 24, width: 320, maxWidth: "85vw" }}>
         <h3 style={{ marginTop: 0 }}>Criar grupo</h3>
         <input
           placeholder="Nome do grupo"
@@ -49,7 +49,7 @@ export default function CreateGroupModal({ onClose, onCreated }) {
           onChange={(e) => setName(e.target.value)}
           style={{ width: "100%", marginBottom: 12 }}
         />
-        <p style={{ fontSize: 13, color: "#777", marginBottom: 6 }}>Participantes</p>
+        <p style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 6 }}>Participantes</p>
         <div style={{ maxHeight: 160, overflowY: "auto", marginBottom: 16 }}>
           {users.map((u) => (
             <label key={u.id} style={{ display: "flex", gap: 8, alignItems: "center", padding: "4px 0", fontSize: 14 }}>

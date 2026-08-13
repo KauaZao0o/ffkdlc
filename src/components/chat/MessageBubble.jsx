@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Avatar from "@/components/common/Avatar.jsx";
 
 export default function MessageBubble({ message, isOwn, onDelete }) {
   const [hover, setHover] = useState(false);
@@ -25,50 +26,63 @@ export default function MessageBubble({ message, isOwn, onDelete }) {
       }}
     >
       {!isOwn && (
-        <span style={{ fontSize: 11, color: "#888", marginBottom: 2 }}>{message.sender?.username}</span>
+        <span style={{ fontSize: 11, color: "var(--text-faint)", marginBottom: 2, marginLeft: 40 }}>
+          {message.sender?.username}
+        </span>
       )}
-      <div style={{ display: "flex", alignItems: "center", gap: 6, flexDirection: isOwn ? "row-reverse" : "row", minWidth: 0 }}>
-        <div
-          style={{
-            background: isOwn ? "#185fa5" : "#f0f0ee",
-            color: isOwn ? "white" : "#1c1c1a",
-            padding: isImage || isAudio ? 4 : "8px 12px",
-            borderRadius: 12,
-            minWidth: 0,
-            fontSize: 14,
-            overflowWrap: "break-word",
-            whiteSpace: "pre-wrap",
-          }}
-        >
-          {isImage ? (
-            <img
-              src={message.fileUrl}
-              alt="Imagem enviada no chat"
-              style={{ maxWidth: "100%", width: 220, maxHeight: 260, borderRadius: 8, display: "block", objectFit: "cover" }}
-            />
-          ) : isAudio ? (
-            <audio controls src={message.fileUrl} style={{ maxWidth: 220, height: 36, display: "block" }} />
-          ) : (
-            message.content
-          )}
-        </div>
-        {isOwn && hover && (
-          <button
-            onClick={() => onDelete(message.id)}
-            title="Apagar mensagem"
+      {/* A foto de perfil sempre fica no mesmo lado externo da bolha: à
+          direita nas mensagens próprias, à esquerda nas dos outros - nunca
+          muda de posição de uma mensagem pra outra. */}
+      <div style={{ display: "flex", alignItems: "flex-end", gap: 6, flexDirection: isOwn ? "row-reverse" : "row", minWidth: 0 }}>
+        <Avatar
+          username={message.sender?.username}
+          avatarColor={message.sender?.avatarColor}
+          avatarUrl={message.sender?.avatarUrl}
+          size={28}
+        />
+        <div style={{ display: "flex", alignItems: "center", gap: 6, flexDirection: isOwn ? "row-reverse" : "row", minWidth: 0 }}>
+          <div
             style={{
-              border: "none",
-              background: "transparent",
-              color: "#c0392b",
+              background: isOwn ? "var(--bubble-own-bg)" : "var(--bubble-other-bg)",
+              color: isOwn ? "var(--bubble-own-text)" : "var(--bubble-other-text)",
+              padding: isImage || isAudio ? 4 : "8px 12px",
+              borderRadius: 12,
+              minWidth: 0,
               fontSize: 14,
-              padding: 2,
-              cursor: "pointer",
-              flexShrink: 0,
+              overflowWrap: "break-word",
+              whiteSpace: "pre-wrap",
             }}
           >
-            🗑
-          </button>
-        )}
+            {isImage ? (
+              <img
+                src={message.fileUrl}
+                alt="Imagem enviada no chat"
+                style={{ maxWidth: "100%", width: 220, maxHeight: 260, borderRadius: 8, display: "block", objectFit: "cover" }}
+              />
+            ) : isAudio ? (
+              <audio controls src={message.fileUrl} style={{ maxWidth: 220, height: 36, display: "block" }} />
+            ) : (
+              message.content
+            )}
+          </div>
+          {isOwn && hover && (
+            <button
+              onClick={() => onDelete(message.id)}
+              title="Apagar mensagem"
+              style={{
+                border: "none",
+                background: "transparent",
+                color: "var(--danger)",
+                fontSize: 14,
+                padding: 2,
+                cursor: "pointer",
+                flexShrink: 0,
+              }}
+            >
+              🗑
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );

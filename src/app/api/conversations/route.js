@@ -36,6 +36,8 @@ export async function GET(request) {
         id: conv.id,
         isGroup: conv.isGroup,
         name: conv.isGroup ? conv.name : otherMembers[0]?.username || "Conversa",
+        avatarUrl: conv.isGroup ? conv.avatarUrl : otherMembers[0]?.avatarUrl || null,
+        avatarColor: conv.isGroup ? null : otherMembers[0]?.avatarColor,
         lastMessage: conv.messages[0] || null,
         participants: otherMembers.map((u) => ({
           id: u.id,

@@ -47,11 +47,11 @@ export default function AddParticipantsModal({ conversation, currentParticipantI
         zIndex: 10,
       }}
     >
-      <div style={{ background: "white", borderRadius: 12, padding: 24, width: 320, maxWidth: "85vw" }}>
+      <div style={{ background: "var(--surface)", color: "var(--text)", borderRadius: 12, padding: 24, width: 320, maxWidth: "85vw" }}>
         <h3 style={{ marginTop: 0 }}>Adicionar participantes</h3>
-        <p style={{ fontSize: 13, color: "#777", marginBottom: 6 }}>Escolha quem entrar no grupo "{conversation.name}"</p>
+        <p style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 6 }}>Escolha quem entrar no grupo "{conversation.name}"</p>
         <div style={{ maxHeight: 200, overflowY: "auto", marginBottom: 16 }}>
-          {users.length === 0 && <p style={{ fontSize: 13, color: "#888" }}>Todo mundo já está nesse grupo.</p>}
+          {users.length === 0 && <p style={{ fontSize: 13, color: "var(--text-faint)" }}>Todo mundo já está nesse grupo.</p>}
           {users.map((u) => (
             <label key={u.id} style={{ display: "flex", gap: 8, alignItems: "center", padding: "4px 0", fontSize: 14 }}>
               <input type="checkbox" checked={selected.includes(u.id)} onChange={() => toggleUser(u.id)} />

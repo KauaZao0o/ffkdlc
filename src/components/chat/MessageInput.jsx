@@ -138,11 +138,11 @@ export default function MessageInput({ channelRef, userId, conversationId, onSen
       onSubmit={handleSubmit}
       style={{
         padding: "12px 16px",
-        borderTop: "1px solid #e2e2e0",
+        borderTop: "1px solid var(--border)",
         display: "flex",
         gap: 8,
         alignItems: "center",
-        background: "white",
+        background: "var(--surface)",
       }}
     >
       <button
@@ -152,7 +152,7 @@ export default function MessageInput({ channelRef, userId, conversationId, onSen
         disabled={uploading}
         style={
           isRecording
-            ? { background: "#c0392b", color: "white", borderColor: "#c0392b", whiteSpace: "nowrap" }
+            ? { background: "var(--danger)", color: "white", borderColor: "var(--danger)", whiteSpace: "nowrap" }
             : undefined
         }
       >

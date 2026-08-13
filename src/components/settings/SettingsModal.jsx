@@ -2,11 +2,13 @@
 
 import { useState } from "react";
 import { useAuth } from "@/context/AuthContext.jsx";
+import { useTheme } from "@/context/ThemeContext.jsx";
 import { uploadChatFile } from "@/lib/uploadImage";
 import Avatar from "@/components/common/Avatar.jsx";
 
 export default function SettingsModal({ onClose }) {
   const { user, updateUser } = useAuth();
+  const { isDark, toggle: toggleTheme } = useTheme();
 
   const [username, setUsername] = useState(user.username);
   const [avatarUrl, setAvatarUrl] = useState(user.avatarUrl || "");
@@ -121,7 +123,7 @@ export default function SettingsModal({ onClose }) {
         </div>
 
         <form onSubmit={handleSaveProfile} style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 28 }}>
-          <p style={{ margin: 0, fontSize: 13, fontWeight: 500, color: "#777" }}>Perfil</p>
+          <p style={{ margin: 0, fontSize: 13, fontWeight: 500, color: "var(--text-muted)" }}>Perfil</p>
 
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <Avatar username={username} avatarColor={user.avatarColor} avatarUrl={avatarUrl} size={56} />
@@ -137,21 +139,32 @@ export default function SettingsModal({ onClose }) {
             </label>
           </div>
 
-          <label style={{ fontSize: 13, color: "#777" }}>
+          <label style={{ fontSize: 13, color: "var(--text-muted)" }}>
             Nome de usuário
             <input value={username} onChange={(e) => setUsername(e.target.value)} style={{ width: "100%", marginTop: 4 }} />
           </label>
 
-          {profileError && <p style={{ color: "#c0392b", fontSize: 13, margin: 0 }}>{profileError}</p>}
-          {profileSuccess && <p style={{ color: "#2f7a2f", fontSize: 13, margin: 0 }}>{profileSuccess}</p>}
+          {profileError && <p style={{ color: "var(--danger)", fontSize: 13, margin: 0 }}>{profileError}</p>}
+          {profileSuccess && <p style={{ color: "var(--success)", fontSize: 13, margin: 0 }}>{profileSuccess}</p>}
 
           <button type="submit" className="primary" disabled={savingProfile || uploadingAvatar}>
             {savingProfile ? "Salvando..." : "Salvar perfil"}
           </button>
         </form>
 
+        <div style={{ marginBottom: 28 }}>
+          <p style={{ margin: 0, fontSize: 13, fontWeight: 500, color: "var(--text-muted)", marginBottom: 12 }}>Aparência</p>
+          <label style={{ display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer" }}>
+            <span style={{ fontSize: 14 }}>Modo escuro</span>
+            <span className="theme-switch">
+              <input type="checkbox" checked={isDark} onChange={toggleTheme} />
+              <span className="theme-switch-track" />
+            </span>
+          </label>
+        </div>
+
         <form onSubmit={handleChangePassword} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          <p style={{ margin: 0, fontSize: 13, fontWeight: 500, color: "#777" }}>Trocar senha</p>
+          <p style={{ margin: 0, fontSize: 13, fontWeight: 500, color: "var(--text-muted)" }}>Trocar senha</p>
 
           <input
             type="password"
@@ -172,8 +185,8 @@ export default function SettingsModal({ onClose }) {
             onChange={(e) => setConfirmPassword(e.target.value)}
           />
 
-          {passwordError && <p style={{ color: "#c0392b", fontSize: 13, margin: 0 }}>{passwordError}</p>}
-          {passwordSuccess && <p style={{ color: "#2f7a2f", fontSize: 13, margin: 0 }}>{passwordSuccess}</p>}
+          {passwordError && <p style={{ color: "var(--danger)", fontSize: 13, margin: 0 }}>{passwordError}</p>}
+          {passwordSuccess && <p style={{ color: "var(--success)", fontSize: 13, margin: 0 }}>{passwordSuccess}</p>}
 
           <button type="submit" disabled={savingPassword}>
             {savingPassword ? "Salvando..." : "Trocar senha"}

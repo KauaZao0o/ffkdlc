@@ -36,6 +36,7 @@ model Conversation {
   id        String   @id @default(uuid())
   isGroup   Boolean  @default(false) @map("is_group")
   name      String?
+  avatarUrl String?  @map("avatar_url")
   createdAt DateTime @default(now()) @map("created_at")
 
   members  ConversationMember[]

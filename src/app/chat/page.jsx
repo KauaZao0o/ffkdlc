@@ -112,6 +112,17 @@ export default function ChatPage() {
     setShowParticipantsDrawer(false);
   }
 
+  // Quando o nome ou a foto do grupo mudam, reflete na lista de conversas
+  // e no cabeçalho do chat aberto, sem precisar recarregar a página.
+  function handleGroupUpdated(updated) {
+    setConversations((prev) =>
+      prev.map((c) => (c.id === updated.id ? { ...c, name: updated.name, avatarUrl: updated.avatarUrl } : c))
+    );
+    setActiveConversation((prev) =>
+      prev?.id === updated.id ? { ...prev, name: updated.name, avatarUrl: updated.avatarUrl } : prev
+    );
+  }
+
   if (loading || !user) return null;
 
   return (
@@ -165,6 +176,7 @@ export default function ChatPage() {
           conversation={activeConversation}
           onGroupDeleted={removeConversationFromView}
           onLeftGroup={removeConversationFromView}
+          onGroupUpdated={handleGroupUpdated}
         />
       </div>
 
@@ -175,6 +187,7 @@ export default function ChatPage() {
               conversation={activeConversation}
               onGroupDeleted={removeConversationFromView}
               onLeftGroup={removeConversationFromView}
+              onGroupUpdated={handleGroupUpdated}
               variant="drawer"
               onClose={() => setShowParticipantsDrawer(false)}
             />

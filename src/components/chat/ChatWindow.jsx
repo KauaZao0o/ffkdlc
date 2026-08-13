@@ -196,7 +196,7 @@ export default function ChatWindow({ conversation, onHideConversation, onBack, o
 
   if (!conversation) {
     return (
-      <div className="chat-main" style={{ alignItems: "center", justifyContent: "center", color: "#888" }}>
+      <div className="chat-main" style={{ alignItems: "center", justifyContent: "center", color: "var(--text-faint)" }}>
         Selecione uma conversa para começar
       </div>
     );
@@ -207,15 +207,15 @@ export default function ChatWindow({ conversation, onHideConversation, onBack, o
       <div
         style={{
           padding: "12px 18px",
-          borderBottom: "1px solid #e2e2e0",
-          background: "white",
+          borderBottom: "1px solid var(--border)",
+          background: "var(--surface)",
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
           gap: 8,
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, flex: 1 }}>
           <button className="icon-button mobile-only" onClick={onBack} title="Voltar para as conversas">
             ←
           </button>
@@ -226,6 +226,8 @@ export default function ChatWindow({ conversation, onHideConversation, onBack, o
               whiteSpace: "nowrap",
               overflow: "hidden",
               textOverflow: "ellipsis",
+              minWidth: 0,
+              flex: 1,
             }}
           >
             {conversation.name}
@@ -261,7 +263,7 @@ export default function ChatWindow({ conversation, onHideConversation, onBack, o
           {messages.map((m) => (
             <MessageBubble key={m.id} message={m} isOwn={m.senderId === user.id} onDelete={handleDeleteMessage} />
           ))}
-          {typingUser && <p style={{ fontSize: 13, color: "#888", margin: 0 }}>digitando...</p>}
+          {typingUser && <p style={{ fontSize: 13, color: "var(--text-faint)", margin: 0 }}>digitando...</p>}
           <div ref={bottomRef} />
         </div>
 

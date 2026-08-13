@@ -6,7 +6,7 @@ export default function ConversationList({ conversations, activeId, onSelect, on
       <div
         style={{
           padding: "14px 16px",
-          borderBottom: "1px solid #e2e2e0",
+          borderBottom: "1px solid var(--border)",
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
@@ -17,7 +17,7 @@ export default function ConversationList({ conversations, activeId, onSelect, on
       </div>
       <div style={{ flex: 1, overflowY: "auto" }}>
         {conversations.length === 0 && (
-          <p style={{ padding: 16, fontSize: 13, color: "#888" }}>Nenhuma conversa ainda. Comece uma nova!</p>
+          <p style={{ padding: 16, fontSize: 13, color: "var(--text-faint)" }}>Nenhuma conversa ainda. Comece uma nova!</p>
         )}
         {conversations.map((c) => (
           <ConversationItem key={c.id} conversation={c} isActive={c.id === activeId} onClick={() => onSelect(c)} />

@@ -29,7 +29,7 @@ export default function RegisterPage() {
       <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <input placeholder="Usuário" value={username} onChange={(e) => setUsername(e.target.value)} required />
         <input type="password" placeholder="Senha" value={password} onChange={(e) => setPassword(e.target.value)} required />
-        {error && <p style={{ color: "#c0392b", fontSize: 13 }}>{error}</p>}
+        {error && <p style={{ color: "var(--danger)", fontSize: 13 }}>{error}</p>}
         <button type="submit" className="primary">Cadastrar</button>
       </form>
       <p style={{ fontSize: 14, marginTop: 16 }}>
