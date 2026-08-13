@@ -13,15 +13,23 @@ export async function POST(request) {
 
   const uniqueMemberIds = Array.from(new Set([...memberIds, userId]));
 
-  const group = await prisma.conversation.create({
-    data: {
-      isGroup: true,
-      name,
-      members: {
-        create: uniqueMemberIds.map((id) => ({ userId: id, isAdmin: id === userId })),
+  try {
+    const group = await prisma.conversation.create({
+      data: {
+        isGroup: true,
+        name,
+        members: {
+          create: uniqueMemberIds.map((id) => ({ userId: id, isAdmin: id === userId })),
+        },
       },
-    },
-  });
+    });
 
-  return NextResponse.json({ id: group.id, name: group.name }, { status: 201 });
+    return NextResponse.json({ id: group.id, name: group.name }, { status: 201 });
+  } catch (err) {
+    console.error("Erro ao criar grupo:", err);
+    return NextResponse.json(
+      { error: "Não foi possível criar o grupo. Tente novamente em instantes." },
+      { status: 500 }
+    );
+  }
 }

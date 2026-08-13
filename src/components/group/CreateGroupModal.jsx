@@ -6,6 +6,8 @@ export default function CreateGroupModal({ onClose, onCreated }) {
   const [name, setName] = useState("");
   const [users, setUsers] = useState([]);
   const [selected, setSelected] = useState([]);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     fetch("/api/users", { credentials: "include" })
@@ -19,14 +21,34 @@ export default function CreateGroupModal({ onClose, onCreated }) {
 
   async function handleCreate() {
     if (!name.trim() || selected.length === 0) return;
-    const res = await fetch("/api/groups", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify({ name, memberIds: selected }),
-    });
-    const data = await res.json();
-    if (res.ok) onCreated(data);
+    setError("");
+    setLoading(true);
+    try {
+      const res = await fetch("/api/groups", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ name, memberIds: selected }),
+      });
+
+      let data = null;
+      try {
+        data = await res.json();
+      } catch {
+        // resposta sem corpo JSON (ex: erro 500 genérico do servidor)
+      }
+
+      if (!res.ok) {
+        setError(data?.error || `Erro ao criar grupo (status ${res.status}).`);
+        return;
+      }
+
+      onCreated(data);
+    } catch (err) {
+      setError("Falha de conexão. Verifique sua internet e tente novamente.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -58,9 +80,14 @@ export default function CreateGroupModal({ onClose, onCreated }) {
             </label>
           ))}
         </div>
+        {error && (
+          <p style={{ color: "#e5484d", fontSize: 13, marginBottom: 12 }}>{error}</p>
+        )}
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
-          <button onClick={onClose}>Cancelar</button>
-          <button className="primary" onClick={handleCreate}>Criar</button>
+          <button onClick={onClose} disabled={loading}>Cancelar</button>
+          <button className="primary" onClick={handleCreate} disabled={loading}>
+            {loading ? "Criando..." : "Criar"}
+          </button>
         </div>
       </div>
     </div>
