@@ -70,10 +70,7 @@ export default function ParticipantsList({ conversation, onGroupDeleted, onLeftG
   }
 
   return (
-    <div
-      className={variant === "panel" ? "participants-panel" : ""}
-      style={{ display: "flex", flexDirection: "column", height: "100%" }}
-    >
+    <div className={variant === "panel" ? "participants-panel" : "drawer-content"}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
         <p style={{ fontSize: 13, fontWeight: 500, color: "#777", margin: 0 }}>Participantes</p>
         <div style={{ display: "flex", gap: 6 }}>
