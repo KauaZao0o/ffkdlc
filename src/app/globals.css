@@ -122,14 +122,6 @@ button:disabled {
   border-left: 1px solid #e2e2e0;
   padding: 16px;
   background: white;
-  display: flex;
-  flex-direction: column;
-}
-
-.drawer-content {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
 }
 
 .hide-conversation-btn {
