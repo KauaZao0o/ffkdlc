@@ -64,9 +64,9 @@ export default function ChatWindow({ conversation, onHideConversation, onBack, o
 
       const map = {};
       participants.forEach((p) => {
-        map[p.id] = { username: p.username, avatarColor: p.avatarColor };
+        map[p.id] = { username: p.username, avatarColor: p.avatarColor, avatarUrl: p.avatarUrl };
       });
-      map[user.id] = { username: user.username, avatarColor: user.avatarColor };
+      map[user.id] = { username: user.username, avatarColor: user.avatarColor, avatarUrl: user.avatarUrl };
       participantsMapRef.current = map;
 
       lastMessageIdRef.current = history[history.length - 1]?.id ?? null;

@@ -10,7 +10,7 @@ export async function GET(request, { params }) {
   const messages = await prisma.message.findMany({
     where: { conversationId: params.id },
     orderBy: { createdAt: "asc" },
-    include: { sender: { select: { id: true, username: true, avatarColor: true } } },
+    include: { sender: { select: { id: true, username: true, avatarColor: true, avatarUrl: true } } },
   });
 
   return NextResponse.json(messages);
@@ -35,7 +35,7 @@ export async function POST(request, { params }) {
 
   const message = await prisma.message.create({
     data: { content: content || "", conversationId: params.id, senderId: userId, type, fileUrl },
-    include: { sender: { select: { id: true, username: true, avatarColor: true } } },
+    include: { sender: { select: { id: true, username: true, avatarColor: true, avatarUrl: true } } },
   });
 
   return NextResponse.json(message, { status: 201 });

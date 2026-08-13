@@ -45,8 +45,14 @@ export function AuthProvider({ children }) {
     setUser(null);
   }
 
+  // Atualiza os dados do usuário logado localmente (usado depois de salvar
+  // o perfil nas configurações), sem precisar recarregar a página.
+  function updateUser(partialUser) {
+    setUser((prev) => (prev ? { ...prev, ...partialUser } : prev));
+  }
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, register, logout, updateUser }}>
       {children}
     </AuthContext.Provider>
   );

@@ -8,7 +8,7 @@ export async function GET(request) {
 
   const users = await prisma.user.findMany({
     where: { id: { not: userId } },
-    select: { id: true, username: true, avatarColor: true, isOnline: true },
+    select: { id: true, username: true, avatarColor: true, avatarUrl: true, isOnline: true },
   });
 
   return NextResponse.json(users);

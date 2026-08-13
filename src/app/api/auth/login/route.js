@@ -20,7 +20,7 @@ export async function POST(request) {
     const token = generateToken(user.id);
 
     const response = NextResponse.json({
-      user: { id: user.id, username: user.username, avatarColor: user.avatarColor },
+      user: { id: user.id, username: user.username, avatarColor: user.avatarColor, avatarUrl: user.avatarUrl },
     });
     setAuthCookie(response, token);
     return response;

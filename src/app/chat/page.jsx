@@ -9,12 +9,15 @@ import ConversationList from "@/components/sidebar/ConversationList.jsx";
 import ChatWindow from "@/components/chat/ChatWindow.jsx";
 import ParticipantsList from "@/components/group/ParticipantsList.jsx";
 import CreateGroupModal from "@/components/group/CreateGroupModal.jsx";
+import SettingsModal from "@/components/settings/SettingsModal.jsx";
+import Avatar from "@/components/common/Avatar.jsx";
 
 export default function ChatPage() {
   const [conversations, setConversations] = useState([]);
   const [activeConversation, setActiveConversation] = useState(null);
   const [showGroupModal, setShowGroupModal] = useState(false);
   const [showParticipantsDrawer, setShowParticipantsDrawer] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   // No celular, alterna entre ver a lista de conversas e ver o chat aberto.
   const [mobileView, setMobileView] = useState("list");
   const { user, loading, logout } = useAuth();
@@ -118,6 +121,14 @@ export default function ChatPage() {
         <div className="top-bar-actions">
           <button
             className="icon-button"
+            onClick={() => setShowSettings(true)}
+            title="Configurações"
+            style={{ padding: 0, overflow: "hidden" }}
+          >
+            <Avatar username={user.username} avatarColor={user.avatarColor} avatarUrl={user.avatarUrl} size={34} />
+          </button>
+          <button
+            className="icon-button"
             onClick={toggleSound}
             title={soundEnabled ? "Desativar som de notificação" : "Ativar som de notificação"}
           >
@@ -174,6 +185,8 @@ export default function ChatPage() {
       {showGroupModal && (
         <CreateGroupModal onClose={() => setShowGroupModal(false)} onCreated={handleGroupCreated} />
       )}
+
+      {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
     </div>
   );
 }

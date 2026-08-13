@@ -41,6 +41,7 @@ export async function GET(request) {
           id: u.id,
           username: u.username,
           avatarColor: u.avatarColor,
+          avatarUrl: u.avatarUrl,
         })),
       };
     });

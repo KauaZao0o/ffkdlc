@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext.jsx";
 import AddParticipantsModal from "./AddParticipantsModal.jsx";
+import Avatar from "@/components/common/Avatar.jsx";
 
 export default function ParticipantsList({ conversation, onGroupDeleted, onLeftGroup, variant = "panel", onClose }) {
   const [participants, setParticipants] = useState([]);
@@ -87,22 +88,7 @@ export default function ParticipantsList({ conversation, onGroupDeleted, onLeftG
       <div style={{ flex: 1 }}>
         {participants.map((p) => (
           <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-            <div
-              style={{
-                width: 28,
-                height: 28,
-                borderRadius: "50%",
-                background: "#dbe9fb",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: 11,
-                fontWeight: 500,
-                color: "#185fa5",
-              }}
-            >
-              {p.username.slice(0, 2).toUpperCase()}
-            </div>
+            <Avatar username={p.username} avatarColor={p.avatarColor} avatarUrl={p.avatarUrl} size={28} />
             <p style={{ margin: 0, fontSize: 13 }}>
               {p.username}
               {p.isAdmin ? " (admin)" : ""}

@@ -177,6 +177,15 @@ with check (bucket_id = 'chat-files');
 > bucket de imagens acessível por qualquer pessoa com a `anon key` (que já
 > é pública). Para um projeto pessoal tudo bem, mas vale saber que existe.
 
+- **Configurações de perfil**: clique no seu próprio avatar (canto
+  superior esquerdo da barra de topo) para abrir um painel onde dá pra
+  trocar a foto de perfil, o nome de usuário e a senha. A foto usa o
+  mesmo bucket `chat-files` do Supabase Storage.
+
+> Essa versão adiciona o campo `avatarUrl` ao usuário - depois de
+> atualizar o projeto, rode `npx prisma migrate dev` de novo antes de
+> testar.
+
 ## Onde adicionar as funcionalidades futuras
 
 | Funcionalidade | Onde mexer |

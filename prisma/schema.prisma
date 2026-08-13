@@ -18,6 +18,7 @@ model User {
   username     String    @unique
   passwordHash String    @map("password_hash")
   avatarColor  String    @default("blue") @map("avatar_color")
+  avatarUrl    String?   @map("avatar_url")
   createdAt    DateTime  @default(now()) @map("created_at")
 
   // preparado para status online/offline no futuro

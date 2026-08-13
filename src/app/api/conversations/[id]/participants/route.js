@@ -8,7 +8,7 @@ export async function GET(request, { params }) {
 
   const members = await prisma.conversationMember.findMany({
     where: { conversationId: params.id },
-    include: { user: { select: { id: true, username: true, avatarColor: true, isOnline: true } } },
+    include: { user: { select: { id: true, username: true, avatarColor: true, avatarUrl: true, isOnline: true } } },
   });
 
   return NextResponse.json(members.map((m) => ({ ...m.user, isAdmin: m.isAdmin })));
