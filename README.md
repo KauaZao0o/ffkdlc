@@ -141,10 +141,18 @@ chat-next/
   também confere a cada 5 segundos se a última mensagem de alguma
   conversa mudou (mesma lógica de segurança usada pras mensagens em si) -
   então o som toca mesmo se o Realtime não estiver entregando o evento.
-- **Enviar fotos**: botão 📷 ao lado do campo de mensagem. A imagem é
-  enviada direto do navegador para o **Supabase Storage** (gratuito) e a
+- **Enviar fotos**: cole uma imagem copiada (Ctrl+V) direto no campo de
+  mensagem. A imagem é enviada para o **Supabase Storage** (gratuito) e a
   URL fica salva na mensagem. Requer configurar um bucket - veja o Passo 6
   abaixo.
+- **Mensagens de áudio**: botão 🎤 ao lado do campo de mensagem. Clique
+  para começar a gravar (o botão vira um cronômetro vermelho), clique de
+  novo para parar - o áudio é enviado automaticamente. Usa a
+  `MediaRecorder API` do navegador; funciona em HTTPS (produção) e em
+  `localhost` (dev), mas não funciona em `http://` puro. Grava em formato
+  `.webm`, que a maioria dos navegadores toca bem, exceto o Safari/iOS
+  mais antigos - se isso for um problema para o seu público, dá pra trocar
+  a gravação para `.mp4` com uma biblioteca como `RecordRTC`.
 
 ## Passo 6 — Ativar o envio de fotos (Supabase Storage)
 

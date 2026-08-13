@@ -5,6 +5,7 @@ import { useState } from "react";
 export default function MessageBubble({ message, isOwn, onDelete }) {
   const [hover, setHover] = useState(false);
   const isImage = message.type === "image" && message.fileUrl;
+  const isAudio = message.type === "audio" && message.fileUrl;
 
   return (
     <div
@@ -31,7 +32,7 @@ export default function MessageBubble({ message, isOwn, onDelete }) {
           style={{
             background: isOwn ? "#185fa5" : "#f0f0ee",
             color: isOwn ? "white" : "#1c1c1a",
-            padding: isImage ? 4 : "8px 12px",
+            padding: isImage || isAudio ? 4 : "8px 12px",
             borderRadius: 12,
             minWidth: 0,
             fontSize: 14,
@@ -45,6 +46,8 @@ export default function MessageBubble({ message, isOwn, onDelete }) {
               alt="Imagem enviada no chat"
               style={{ maxWidth: "100%", width: 220, maxHeight: 260, borderRadius: 8, display: "block", objectFit: "cover" }}
             />
+          ) : isAudio ? (
+            <audio controls src={message.fileUrl} style={{ maxWidth: 220, height: 36, display: "block" }} />
           ) : (
             message.content
           )}

@@ -25,9 +25,9 @@ export async function POST(request, { params }) {
 
   const { content, type = "text", fileUrl } = await request.json();
 
-  if (type === "image") {
+  if (type === "image" || type === "audio") {
     if (!fileUrl) {
-      return NextResponse.json({ error: "Imagem inválida." }, { status: 400 });
+      return NextResponse.json({ error: "Arquivo inválido." }, { status: 400 });
     }
   } else if (!content || !content.trim()) {
     return NextResponse.json({ error: "Mensagem vazia." }, { status: 400 });
