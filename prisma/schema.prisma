@@ -27,6 +27,7 @@ model User {
 
   memberships  ConversationMember[]
   messages     Message[]
+  hiddenMessages MessageHiddenFor[]
 
   @@map("users")
 }
@@ -79,6 +80,23 @@ model Message {
 
   sender       User         @relation(fields: [senderId], references: [id], onDelete: Cascade)
   conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  hiddenFor    MessageHiddenFor[]
 
   @@map("messages")
+}
+
+// Quando alguém escolhe "apagar para mim" numa mensagem específica, cria
+// uma linha aqui - a mensagem continua existindo pra todo mundo, só
+// desaparece da lista de quem apagou.
+model MessageHiddenFor {
+  id        String   @id @default(uuid())
+  messageId String   @map("message_id")
+  userId    String   @map("user_id")
+  hiddenAt  DateTime @default(now()) @map("hidden_at")
+
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId])
+  @@map("message_hidden_for")
 }

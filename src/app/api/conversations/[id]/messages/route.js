@@ -8,7 +8,10 @@ export async function GET(request, { params }) {
   if (!userId) return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
 
   const messages = await prisma.message.findMany({
-    where: { conversationId: params.id },
+    where: {
+      conversationId: params.id,
+      hiddenFor: { none: { userId } },
+    },
     orderBy: { createdAt: "asc" },
     include: { sender: { select: { id: true, username: true, avatarColor: true, avatarUrl: true } } },
   });

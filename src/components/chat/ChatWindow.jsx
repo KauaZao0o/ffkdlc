@@ -12,6 +12,7 @@ export default function ChatWindow({ conversation, onHideConversation, onBack, o
   const [messages, setMessages] = useState([]);
   const [typingUser, setTypingUser] = useState(null);
   const [showJumpButton, setShowJumpButton] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
   const { user } = useAuth();
   const bottomRef = useRef(null);
   const scrollContainerRef = useRef(null);
@@ -68,6 +69,8 @@ export default function ChatWindow({ conversation, onHideConversation, onBack, o
       });
       map[user.id] = { username: user.username, avatarColor: user.avatarColor, avatarUrl: user.avatarUrl };
       participantsMapRef.current = map;
+
+      setIsAdmin(!!participants.find((p) => p.id === user.id)?.isAdmin);
 
       lastMessageIdRef.current = history[history.length - 1]?.id ?? null;
       setMessages(history);
@@ -160,7 +163,7 @@ export default function ChatWindow({ conversation, onHideConversation, onBack, o
     }
   }
 
-  async function handleDeleteMessage(messageId) {
+  async function handleDeleteForEveryone(messageId) {
     const previous = messages;
     setMessages((prev) => prev.filter((m) => m.id !== messageId));
 
@@ -171,6 +174,22 @@ export default function ChatWindow({ conversation, onHideConversation, onBack, o
 
     if (!res.ok) {
       // Se der erro no servidor, volta a mensagem pra tela.
+      setMessages(previous);
+      const data = await res.json();
+      alert(data.error || "Não foi possível apagar.");
+    }
+  }
+
+  async function handleHideForMe(messageId) {
+    const previous = messages;
+    setMessages((prev) => prev.filter((m) => m.id !== messageId));
+
+    const res = await fetch(`/api/conversations/${conversation.id}/messages/${messageId}/hide`, {
+      method: "POST",
+      credentials: "include",
+    });
+
+    if (!res.ok) {
       setMessages(previous);
     }
   }
@@ -261,7 +280,14 @@ export default function ChatWindow({ conversation, onHideConversation, onBack, o
           }}
         >
           {messages.map((m) => (
-            <MessageBubble key={m.id} message={m} isOwn={m.senderId === user.id} onDelete={handleDeleteMessage} />
+            <MessageBubble
+              key={m.id}
+              message={m}
+              isOwn={m.senderId === user.id}
+              canDeleteForEveryone={m.senderId === user.id || (isAdmin && conversation.isGroup)}
+              onHideForMe={handleHideForMe}
+              onDeleteForEveryone={handleDeleteForEveryone}
+            />
           ))}
           {typingUser && <p style={{ fontSize: 13, color: "var(--text-faint)", margin: 0 }}>digitando...</p>}
           <div ref={bottomRef} />
