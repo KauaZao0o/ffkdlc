@@ -2,6 +2,14 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUserIdFromRequest } from "@/lib/auth";
 
+const REPLY_PREVIEW_SELECT = {
+  id: true,
+  content: true,
+  type: true,
+  fileUrl: true,
+  sender: { select: { username: true } },
+};
+
 // Retorna o histórico de mensagens da conversa.
 export async function GET(request, { params }) {
   const userId = getUserIdFromRequest(request);
@@ -13,7 +21,10 @@ export async function GET(request, { params }) {
       hiddenFor: { none: { userId } },
     },
     orderBy: { createdAt: "asc" },
-    include: { sender: { select: { id: true, username: true, avatarColor: true, avatarUrl: true } } },
+    include: {
+      sender: { select: { id: true, username: true, avatarColor: true, avatarUrl: true } },
+      replyTo: { select: REPLY_PREVIEW_SELECT },
+    },
   });
 
   return NextResponse.json(messages);
@@ -26,7 +37,7 @@ export async function POST(request, { params }) {
   const userId = getUserIdFromRequest(request);
   if (!userId) return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
 
-  const { content, type = "text", fileUrl } = await request.json();
+  const { content, type = "text", fileUrl, replyToId } = await request.json();
 
   if (type === "image" || type === "audio" || type === "file") {
     if (!fileUrl) {
@@ -36,9 +47,30 @@ export async function POST(request, { params }) {
     return NextResponse.json({ error: "Mensagem vazia." }, { status: 400 });
   }
 
+  // Confere se a mensagem citada é de fato dessa conversa, pra ninguém
+  // conseguir "responder" citando uma mensagem de outro chat.
+  let validReplyToId = null;
+  if (replyToId) {
+    const target = await prisma.message.findFirst({
+      where: { id: replyToId, conversationId: params.id },
+      select: { id: true },
+    });
+    if (target) validReplyToId = target.id;
+  }
+
   const message = await prisma.message.create({
-    data: { content: content || "", conversationId: params.id, senderId: userId, type, fileUrl },
-    include: { sender: { select: { id: true, username: true, avatarColor: true, avatarUrl: true } } },
+    data: {
+      content: content || "",
+      conversationId: params.id,
+      senderId: userId,
+      type,
+      fileUrl,
+      replyToId: validReplyToId,
+    },
+    include: {
+      sender: { select: { id: true, username: true, avatarColor: true, avatarUrl: true } },
+      replyTo: { select: REPLY_PREVIEW_SELECT },
+    },
   });
 
   return NextResponse.json(message, { status: 201 });

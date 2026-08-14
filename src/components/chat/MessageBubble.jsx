@@ -4,6 +4,21 @@ import { useEffect, useRef, useState } from "react";
 import Avatar from "@/components/common/Avatar.jsx";
 import AudioMessage from "./AudioMessage.jsx";
 
+const MENTION_SPLIT_REGEX = /(@[a-zA-Z0-9_]+)/g;
+const MENTION_TEST_REGEX = /^@[a-zA-Z0-9_]+$/;
+
+function renderContentWithMentions(content) {
+  const parts = content.split(MENTION_SPLIT_REGEX);
+  return parts.map((part, i) =>
+    MENTION_TEST_REGEX.test(part) ? (
+      <span key={i} style={{ fontWeight: 700, color: "var(--primary-bg)" }}>
+        {part}
+      </span>
+    ) : (
+      part
+    )
+  );
+}
 function formatMessageTime(dateStr) {
   const d = new Date(dateStr);
   return d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
@@ -14,7 +29,8 @@ function formatMessageTime(dateStr) {
 // mostrar pro usuário, sem precisar de uma coluna nova no banco.
 function fileNameFromUrl(url) {
   try {
-    const last = decodeURIComponent(url.split("/").pop() || "arquivo");
+    const withoutQuery = url.split("?")[0];
+    const last = decodeURIComponent(withoutQuery.split("/").pop() || "arquivo");
     return last.replace(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-/i, "");
   } catch {
     return "arquivo";
@@ -33,6 +49,17 @@ const FILE_ICONS = {
   pptx: "📙",
   zip: "🗜️",
 };
+
+// Texto curto pra mostrar dentro da citação de "respondendo a" - se a
+// mensagem original era uma foto/áudio/arquivo, mostra um rótulo em vez
+// do conteúdo cru.
+function replyPreviewText(replyTo) {
+  if (!replyTo) return "";
+  if (replyTo.type === "image") return "📷 Foto";
+  if (replyTo.type === "audio") return "🎤 Áudio";
+  if (replyTo.type === "file") return `📎 ${fileNameFromUrl(replyTo.fileUrl || "")}`;
+  return replyTo.content || "";
+}
 
 function FileMessage({ url, isOwn }) {
   const name = fileNameFromUrl(url);
@@ -73,7 +100,7 @@ function FileMessage({ url, isOwn }) {
 
 const MENU_WIDTH = 180;
 
-export default function MessageBubble({ message, isOwn, canDeleteForEveryone, onHideForMe, onDeleteForEveryone }) {
+export default function MessageBubble({ message, isOwn, canDeleteForEveryone, onHideForMe, onDeleteForEveryone, onReply }) {
   const [showMenu, setShowMenu] = useState(false);
   const [menuPos, setMenuPos] = useState(null);
   const menuButtonRef = useRef(null);
@@ -81,6 +108,31 @@ export default function MessageBubble({ message, isOwn, canDeleteForEveryone, on
   const isImage = message.type === "image" && message.fileUrl;
   const isAudio = message.type === "audio" && message.fileUrl;
   const isFile = message.type === "file" && message.fileUrl;
+  const hasFile = isImage || isAudio || isFile;
+
+  function handleReply() {
+    setShowMenu(false);
+    onReply(message);
+  }
+
+  async function handleSave() {
+    setShowMenu(false);
+    try {
+      const res = await fetch(message.fileUrl);
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = blobUrl;
+      a.download = fileNameFromUrl(message.fileUrl);
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(blobUrl);
+    } catch (err) {
+      console.error(err);
+      alert("Não foi possível salvar o arquivo.");
+    }
+  }
 
   // Fecha o menu se a pessoa tocar/clicar em qualquer outro lugar da tela,
   // ou rolar a conversa (já que o menu é posicionado "fixed").
@@ -122,7 +174,7 @@ export default function MessageBubble({ message, isOwn, canDeleteForEveryone, on
     // à direita, não importa onde a mensagem esteja.
     let left = isOwn ? rect.right - MENU_WIDTH : rect.left;
     left = Math.min(Math.max(8, left), window.innerWidth - MENU_WIDTH - 8);
-    const top = Math.min(rect.bottom + 4, window.innerHeight - 90);
+    const top = Math.min(rect.bottom + 4, window.innerHeight - 190);
 
     setMenuPos({ top, left });
     setShowMenu(true);
@@ -164,6 +216,41 @@ export default function MessageBubble({ message, isOwn, canDeleteForEveryone, on
                 whiteSpace: "pre-wrap",
               }}
             >
+              {message.replyTo && (
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 1,
+                    marginBottom: 6,
+                    padding: "5px 8px",
+                    borderRadius: 6,
+                    borderLeft: `3px solid ${isOwn ? "rgba(255,255,255,0.65)" : "var(--group-avatar-fg)"}`,
+                    background: isOwn ? "rgba(255,255,255,0.15)" : "var(--surface-hover)",
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: 12,
+                      fontWeight: 600,
+                      color: isOwn ? "rgba(255,255,255,0.9)" : "var(--group-avatar-fg)",
+                    }}
+                  >
+                    {message.replyTo.sender?.username}
+                  </span>
+                  <span
+                    style={{
+                      fontSize: 12,
+                      opacity: 0.85,
+                      overflow: "hidden",
+                      whiteSpace: "nowrap",
+                      textOverflow: "ellipsis",
+                    }}
+                  >
+                    {replyPreviewText(message.replyTo)}
+                  </span>
+                </div>
+              )}
               {isImage ? (
                 <img
                   src={message.fileUrl}
@@ -175,7 +262,7 @@ export default function MessageBubble({ message, isOwn, canDeleteForEveryone, on
               ) : isFile ? (
                 <FileMessage url={message.fileUrl} isOwn={isOwn} />
               ) : (
-                message.content
+                renderContentWithMentions(message.content)
               )}
             </div>
 
@@ -228,6 +315,41 @@ export default function MessageBubble({ message, isOwn, canDeleteForEveryone, on
           }}
         >
           <button
+            onClick={handleReply}
+            style={{
+              display: "block",
+              width: "100%",
+              textAlign: "left",
+              border: "none",
+              borderRadius: 0,
+              padding: "10px 14px",
+              fontSize: 13,
+              background: "var(--surface)",
+              color: "var(--text)",
+            }}
+          >
+            ↩ Responder
+          </button>
+          {hasFile && (
+            <button
+              onClick={handleSave}
+              style={{
+                display: "block",
+                width: "100%",
+                textAlign: "left",
+                border: "none",
+                borderRadius: 0,
+                borderTop: "1px solid var(--border)",
+                padding: "10px 14px",
+                fontSize: 13,
+                background: "var(--surface)",
+                color: "var(--text)",
+              }}
+            >
+              💾 Salvar
+            </button>
+          )}
+          <button
             onClick={() => {
               setShowMenu(false);
               onHideForMe(message.id);
@@ -238,6 +360,7 @@ export default function MessageBubble({ message, isOwn, canDeleteForEveryone, on
               textAlign: "left",
               border: "none",
               borderRadius: 0,
+              borderTop: "1px solid var(--border)",
               padding: "10px 14px",
               fontSize: 13,
               background: "var(--surface)",

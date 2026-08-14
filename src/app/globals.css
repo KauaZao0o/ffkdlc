@@ -241,6 +241,119 @@ button:disabled {
   display: none;
 }
 
+/* ---------- Barra de mensagem (composer) ---------- */
+
+.composer-icon-btn {
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-muted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 17px;
+  flex-shrink: 0;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.composer-icon-btn:hover:not(:disabled) {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.composer-icon-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.composer-icon-btn.danger {
+  color: var(--danger);
+}
+
+.composer-textarea-wrap {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: flex-end;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  padding: 0 6px 0 16px;
+  transition: border-color 0.15s ease;
+}
+
+.composer-textarea-wrap:focus-within {
+  border-color: var(--text-faint);
+}
+
+.composer-textarea {
+  flex: 1;
+  min-width: 0;
+  resize: none;
+  border: none;
+  background: transparent;
+  padding: 9px 0;
+  line-height: 1.4;
+  font-family: inherit;
+  color: var(--text);
+  outline: none;
+}
+
+.composer-textarea::placeholder {
+  color: var(--text-faint);
+}
+
+.composer-send-btn {
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: var(--primary-bg);
+  color: var(--primary-text);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  flex-shrink: 0;
+  transition: opacity 0.15s ease, transform 0.1s ease;
+}
+
+.composer-send-btn:hover:not(:disabled) {
+  opacity: 0.88;
+}
+
+.composer-send-btn:active:not(:disabled) {
+  transform: scale(0.93);
+}
+
+.composer-send-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.composer-send-btn.danger {
+  background: var(--danger);
+}
+
+/* Bolha "gravando..." que substitui o campo de texto durante a gravação */
+.composer-recording-pill {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 16px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
 /* ---------- Drawer de participantes (usado só no celular) ---------- */
 
 .drawer-overlay {

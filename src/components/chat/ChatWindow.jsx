@@ -13,6 +13,8 @@ export default function ChatWindow({ conversation, onHideConversation, onBack, o
   const [typingUser, setTypingUser] = useState(null);
   const [showJumpButton, setShowJumpButton] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [participants, setParticipants] = useState([]);
+  const [replyTo, setReplyTo] = useState(null);
   const { user } = useAuth();
   const bottomRef = useRef(null);
   const scrollContainerRef = useRef(null);
@@ -51,6 +53,7 @@ export default function ChatWindow({ conversation, onHideConversation, onBack, o
     if (!conversation || !user) return;
 
     let cancelled = false;
+    setReplyTo(null);
 
     async function setup() {
       const [messagesRes, participantsRes] = await Promise.all([
@@ -71,6 +74,7 @@ export default function ChatWindow({ conversation, onHideConversation, onBack, o
       participantsMapRef.current = map;
 
       setIsAdmin(!!participants.find((p) => p.id === user.id)?.isAdmin);
+      setParticipants(participants.filter((p) => p.id !== user.id));
 
       lastMessageIdRef.current = history[history.length - 1]?.id ?? null;
       setMessages(history);
@@ -93,6 +97,22 @@ export default function ChatWindow({ conversation, onHideConversation, onBack, o
 
           setMessages((prev) => {
             if (prev.some((m) => m.id === row.id)) return prev;
+
+            // O evento de tempo real só traz a linha "crua" da mensagem, sem
+            // fazer o join com a mensagem citada. Se ela já estiver
+            // carregada na tela, monta a citação a partir dela; senão, a
+            // próxima atualização periódica (fetchMessages) completa isso.
+            const repliedMessage = row.reply_to_id ? prev.find((m) => m.id === row.reply_to_id) : null;
+            const replyTo = repliedMessage
+              ? {
+                  id: repliedMessage.id,
+                  content: repliedMessage.content,
+                  type: repliedMessage.type,
+                  fileUrl: repliedMessage.fileUrl,
+                  sender: { username: repliedMessage.sender?.username },
+                }
+              : null;
+
             return [
               ...prev,
               {
@@ -103,6 +123,8 @@ export default function ChatWindow({ conversation, onHideConversation, onBack, o
                 conversationId: row.conversation_id,
                 type: row.type,
                 fileUrl: row.file_url,
+                replyToId: row.reply_to_id,
+                replyTo,
                 sender,
               },
             ];
@@ -151,13 +173,14 @@ export default function ChatWindow({ conversation, onHideConversation, onBack, o
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
-      body: JSON.stringify({ content, type, fileUrl }),
+      body: JSON.stringify({ content, type, fileUrl, replyToId: replyTo?.id || null }),
     });
     const message = await res.json();
     if (res.ok) {
       setMessages((prev) => (prev.some((m) => m.id === message.id) ? prev : [...prev, message]));
       // Ao enviar você mesmo, sempre desce pra ver sua própria mensagem.
       isAtBottomRef.current = true;
+      setReplyTo(null);
     } else {
       alert(message.error || "Não foi possível enviar.");
     }
@@ -287,6 +310,7 @@ export default function ChatWindow({ conversation, onHideConversation, onBack, o
               canDeleteForEveryone={m.senderId === user.id || (isAdmin && conversation.isGroup)}
               onHideForMe={handleHideForMe}
               onDeleteForEveryone={handleDeleteForEveryone}
+              onReply={setReplyTo}
             />
           ))}
           {typingUser && <p style={{ fontSize: 13, color: "var(--text-faint)", margin: 0 }}>digitando...</p>}
@@ -312,7 +336,15 @@ export default function ChatWindow({ conversation, onHideConversation, onBack, o
         )}
       </div>
 
-      <MessageInput channelRef={channelRef} userId={user.id} conversationId={conversation.id} onSend={handleSend} />
+      <MessageInput
+        channelRef={channelRef}
+        userId={user.id}
+        conversationId={conversation.id}
+        participants={participants}
+        onSend={handleSend}
+        replyTo={replyTo}
+        onCancelReply={() => setReplyTo(null)}
+      />
     </div>
   );
 }
