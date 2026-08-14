@@ -9,29 +9,61 @@ function formatMessageTime(dateStr) {
   return d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
 }
 
+const MENU_WIDTH = 180;
+
 export default function MessageBubble({ message, isOwn, canDeleteForEveryone, onHideForMe, onDeleteForEveryone }) {
   const [showMenu, setShowMenu] = useState(false);
+  const [menuPos, setMenuPos] = useState(null);
+  const menuButtonRef = useRef(null);
   const menuRef = useRef(null);
   const isImage = message.type === "image" && message.fileUrl;
   const isAudio = message.type === "audio" && message.fileUrl;
 
-  // Fecha o menu se a pessoa tocar/clicar em qualquer outro lugar da tela.
+  // Fecha o menu se a pessoa tocar/clicar em qualquer outro lugar da tela,
+  // ou rolar a conversa (já que o menu é posicionado "fixed").
   useEffect(() => {
     if (!showMenu) return;
 
     function handleOutsideClick(e) {
-      if (menuRef.current && !menuRef.current.contains(e.target)) {
+      if (
+        menuRef.current &&
+        !menuRef.current.contains(e.target) &&
+        !menuButtonRef.current?.contains(e.target)
+      ) {
         setShowMenu(false);
       }
+    }
+    function handleScrollOrResize() {
+      setShowMenu(false);
     }
 
     document.addEventListener("mousedown", handleOutsideClick);
     document.addEventListener("touchstart", handleOutsideClick);
+    window.addEventListener("scroll", handleScrollOrResize, true);
+    window.addEventListener("resize", handleScrollOrResize);
     return () => {
       document.removeEventListener("mousedown", handleOutsideClick);
       document.removeEventListener("touchstart", handleOutsideClick);
+      window.removeEventListener("scroll", handleScrollOrResize, true);
+      window.removeEventListener("resize", handleScrollOrResize);
     };
   }, [showMenu]);
+
+  function openMenu() {
+    const btn = menuButtonRef.current;
+    if (!btn) return;
+    const rect = btn.getBoundingClientRect();
+
+    // Calcula a posição em relação à tela inteira e prende dentro dos
+    // limites visíveis - nunca deixa vazar pra fora, nem à esquerda nem
+    // à direita, não importa onde a mensagem esteja.
+    let left = isOwn ? rect.right - MENU_WIDTH : rect.left;
+    left = Math.min(Math.max(8, left), window.innerWidth - MENU_WIDTH - 8);
+    const top = Math.min(rect.bottom + 4, window.innerHeight - 90);
+
+    setMenuPos({ top, left });
+    setShowMenu(true);
+  }
 
   return (
     <div
@@ -48,8 +80,6 @@ export default function MessageBubble({ message, isOwn, canDeleteForEveryone, on
           {message.sender?.username}
         </span>
       )}
-      {/* A foto de perfil sempre fica no mesmo lado externo da bolha: à
-          direita nas mensagens próprias, à esquerda nas dos outros. */}
       <div style={{ display: "flex", alignItems: "flex-end", gap: 6, flexDirection: isOwn ? "row-reverse" : "row", minWidth: 0 }}>
         <Avatar
           username={message.sender?.username}
@@ -84,85 +114,23 @@ export default function MessageBubble({ message, isOwn, canDeleteForEveryone, on
               )}
             </div>
 
-            {/* Botão de opções: sempre visível (não depende de hover), pra
-                funcionar bem no toque do celular. */}
-            <div style={{ position: "relative", flexShrink: 0 }} ref={menuRef}>
-              <button
-                onClick={() => setShowMenu((v) => !v)}
-                title="Opções da mensagem"
-                style={{
-                  border: "none",
-                  background: "transparent",
-                  color: "var(--text-faint)",
-                  fontSize: 16,
-                  lineHeight: 1,
-                  padding: "6px 4px",
-                  cursor: "pointer",
-                }}
-              >
-                ⋮
-              </button>
-
-              {showMenu && (
-                <div
-                  style={{
-                    position: "absolute",
-                    top: "100%",
-                    [isOwn ? "right" : "left"]: 0,
-                    marginTop: 4,
-                    background: "var(--surface)",
-                    border: "1px solid var(--border)",
-                    borderRadius: 8,
-                    boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
-                    zIndex: 5,
-                    minWidth: 170,
-                    overflow: "hidden",
-                  }}
-                >
-                  <button
-                    onClick={() => {
-                      setShowMenu(false);
-                      onHideForMe(message.id);
-                    }}
-                    style={{
-                      display: "block",
-                      width: "100%",
-                      textAlign: "left",
-                      border: "none",
-                      borderRadius: 0,
-                      padding: "10px 14px",
-                      fontSize: 13,
-                      background: "var(--surface)",
-                      color: "var(--text)",
-                    }}
-                  >
-                    Apagar para mim
-                  </button>
-                  {canDeleteForEveryone && (
-                    <button
-                      onClick={() => {
-                        setShowMenu(false);
-                        onDeleteForEveryone(message.id);
-                      }}
-                      style={{
-                        display: "block",
-                        width: "100%",
-                        textAlign: "left",
-                        border: "none",
-                        borderRadius: 0,
-                        borderTop: "1px solid var(--border)",
-                        padding: "10px 14px",
-                        fontSize: 13,
-                        background: "var(--surface)",
-                        color: "var(--danger)",
-                      }}
-                    >
-                      Apagar para todos
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
+            <button
+              ref={menuButtonRef}
+              onClick={openMenu}
+              title="Opções da mensagem"
+              style={{
+                border: "none",
+                background: "transparent",
+                color: "var(--text-faint)",
+                fontSize: 16,
+                lineHeight: 1,
+                padding: "6px 4px",
+                cursor: "pointer",
+                flexShrink: 0,
+              }}
+            >
+              ⋮
+            </button>
           </div>
 
           <span
@@ -177,6 +145,66 @@ export default function MessageBubble({ message, isOwn, canDeleteForEveryone, on
           </span>
         </div>
       </div>
+
+      {showMenu && menuPos && (
+        <div
+          ref={menuRef}
+          style={{
+            position: "fixed",
+            top: menuPos.top,
+            left: menuPos.left,
+            width: MENU_WIDTH,
+            background: "var(--surface)",
+            border: "1px solid var(--border)",
+            borderRadius: 8,
+            boxShadow: "0 4px 12px rgba(0,0,0,0.25)",
+            zIndex: 50,
+            overflow: "hidden",
+          }}
+        >
+          <button
+            onClick={() => {
+              setShowMenu(false);
+              onHideForMe(message.id);
+            }}
+            style={{
+              display: "block",
+              width: "100%",
+              textAlign: "left",
+              border: "none",
+              borderRadius: 0,
+              padding: "10px 14px",
+              fontSize: 13,
+              background: "var(--surface)",
+              color: "var(--text)",
+            }}
+          >
+            Apagar para mim
+          </button>
+          {canDeleteForEveryone && (
+            <button
+              onClick={() => {
+                setShowMenu(false);
+                onDeleteForEveryone(message.id);
+              }}
+              style={{
+                display: "block",
+                width: "100%",
+                textAlign: "left",
+                border: "none",
+                borderRadius: 0,
+                borderTop: "1px solid var(--border)",
+                padding: "10px 14px",
+                fontSize: 13,
+                background: "var(--surface)",
+                color: "var(--danger)",
+              }}
+            >
+              Apagar para todos
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }

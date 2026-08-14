@@ -21,6 +21,7 @@ export default function MessageInput({ channelRef, userId, conversationId, onSen
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
   const recordingIntervalRef = useRef(null);
+  const cancelledRef = useRef(false);
 
   // Se o usuário sair da conversa/fechar a página no meio de uma gravação,
   // garante que o microfone é liberado.
@@ -108,6 +109,13 @@ export default function MessageInput({ channelRef, userId, conversationId, onSen
 
       recorder.onstop = async () => {
         stream.getTracks().forEach((track) => track.stop());
+
+        if (cancelledRef.current) {
+          cancelledRef.current = false;
+          audioChunksRef.current = [];
+          return;
+        }
+
         const blob = new Blob(audioChunksRef.current, { type: recorder.mimeType || "audio/webm" });
         if (blob.size > 0) {
           const file = new File([blob], `audio-${Date.now()}.webm`, { type: blob.type });
@@ -133,6 +141,13 @@ export default function MessageInput({ channelRef, userId, conversationId, onSen
     setIsRecording(false);
   }
 
+  function cancelRecording() {
+    cancelledRef.current = true;
+    mediaRecorderRef.current?.stop();
+    clearInterval(recordingIntervalRef.current);
+    setIsRecording(false);
+  }
+
   return (
     <form
       onSubmit={handleSubmit}
@@ -145,19 +160,36 @@ export default function MessageInput({ channelRef, userId, conversationId, onSen
         background: "var(--surface)",
       }}
     >
-      <button
-        type="button"
-        title={isRecording ? "Parar e enviar áudio" : "Gravar áudio"}
-        onClick={isRecording ? stopRecording : startRecording}
-        disabled={uploading}
-        style={
-          isRecording
-            ? { background: "var(--danger)", color: "white", borderColor: "var(--danger)", whiteSpace: "nowrap" }
-            : undefined
-        }
-      >
-        {isRecording ? `⏹ ${formatDuration(recordingSeconds)}` : "🎤"}
-      </button>
+      {isRecording ? (
+        <>
+          <button
+            type="button"
+            onClick={cancelRecording}
+            title="Cancelar gravação"
+            style={{ color: "var(--danger)", flexShrink: 0 }}
+          >
+            ✕
+          </button>
+          <button
+            type="button"
+            onClick={stopRecording}
+            title="Parar e enviar áudio"
+            style={{
+              background: "var(--danger)",
+              color: "white",
+              borderColor: "var(--danger)",
+              whiteSpace: "nowrap",
+              flexShrink: 0,
+            }}
+          >
+            ⏹ {formatDuration(recordingSeconds)}
+          </button>
+        </>
+      ) : (
+        <button type="button" title="Gravar áudio" onClick={startRecording} disabled={uploading}>
+          🎤
+        </button>
+      )}
       <input
         type="text"
         placeholder={

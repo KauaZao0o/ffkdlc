@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { registerAudioPlayback, clearAudioPlayback } from "@/lib/audioManager";
 
 function formatTime(seconds) {
   if (!isFinite(seconds) || seconds < 0) return "0:00";
@@ -21,8 +22,28 @@ export default function AudioMessage({ src, isOwn }) {
     const audio = audioRef.current;
     if (!audio) return;
 
+    // Bug conhecido: áudio gravado pelo MediaRecorder (formato webm) às
+    // vezes não grava a duração certa no cabeçalho do arquivo, e o
+    // navegador reporta "Infinity" ou "NaN" - principalmente em celular.
+    // O truque padrão pra corrigir: "pular" pro fim do áudio (isso força
+    // o navegador a recalcular a duração de verdade) e depois voltar pro
+    // início.
+    function fixDurationIfBroken() {
+      if (!isFinite(audio.duration) || audio.duration === 0) {
+        audio.currentTime = 1e7;
+        const onTimeUpdateOnce = () => {
+          audio.removeEventListener("timeupdate", onTimeUpdateOnce);
+          setDuration(audio.duration && isFinite(audio.duration) ? audio.duration : 0);
+          audio.currentTime = 0;
+        };
+        audio.addEventListener("timeupdate", onTimeUpdateOnce);
+      } else {
+        setDuration(audio.duration);
+      }
+    }
+
     function onLoadedMetadata() {
-      setDuration(audio.duration || 0);
+      fixDurationIfBroken();
     }
     function onTimeUpdate() {
       setCurrentTime(audio.currentTime);
@@ -30,30 +51,49 @@ export default function AudioMessage({ src, isOwn }) {
     function onEnded() {
       setIsPlaying(false);
       setCurrentTime(0);
+      clearAudioPlayback(audio);
+    }
+    function onPause() {
+      setIsPlaying(false);
     }
 
     audio.addEventListener("loadedmetadata", onLoadedMetadata);
+    audio.addEventListener("durationchange", onLoadedMetadata);
     audio.addEventListener("timeupdate", onTimeUpdate);
     audio.addEventListener("ended", onEnded);
+    audio.addEventListener("pause", onPause);
 
     return () => {
       audio.removeEventListener("loadedmetadata", onLoadedMetadata);
+      audio.removeEventListener("durationchange", onLoadedMetadata);
       audio.removeEventListener("timeupdate", onTimeUpdate);
       audio.removeEventListener("ended", onEnded);
+      audio.removeEventListener("pause", onPause);
+      clearAudioPlayback(audio);
     };
   }, []);
 
-  function togglePlay(e) {
+  async function togglePlay(e) {
     e.stopPropagation();
     const audio = audioRef.current;
     if (!audio) return;
 
     if (isPlaying) {
       audio.pause();
-    } else {
-      audio.play().catch(() => {});
+      setIsPlaying(false);
+      return;
     }
-    setIsPlaying(!isPlaying);
+
+    try {
+      // Avisa o gerenciador global: qualquer outro áudio tocando agora
+      // pausa sozinho.
+      registerAudioPlayback(audio, () => setIsPlaying(false));
+      await audio.play();
+      setIsPlaying(true);
+    } catch (err) {
+      console.error("Não foi possível tocar o áudio:", err);
+      setIsPlaying(false);
+    }
   }
 
   function handleSeek(e) {
@@ -76,7 +116,7 @@ export default function AudioMessage({ src, isOwn }) {
 
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 8, width: 210, padding: "4px 2px" }}>
-      <audio ref={audioRef} src={src} preload="metadata" style={{ display: "none" }} />
+      <audio ref={audioRef} src={src} preload="metadata" playsInline style={{ display: "none" }} />
 
       <button
         type="button"
@@ -102,16 +142,7 @@ export default function AudioMessage({ src, isOwn }) {
         {isPlaying ? "⏸" : "▶"}
       </button>
 
-      {/* Barra de progresso maior que o visual, pra ser fácil de tocar no celular */}
-      <div
-        onClick={handleSeek}
-        onTouchStart={handleSeek}
-        style={{
-          flex: 1,
-          padding: "10px 0",
-          cursor: "pointer",
-        }}
-      >
+      <div onClick={handleSeek} onTouchStart={handleSeek} style={{ flex: 1, padding: "10px 0", cursor: "pointer" }}>
         <div style={{ height: 4, borderRadius: 2, background: trackColor, position: "relative" }}>
           <div
             style={{
