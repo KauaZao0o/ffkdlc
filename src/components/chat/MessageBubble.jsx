@@ -9,6 +9,68 @@ function formatMessageTime(dateStr) {
   return d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
 }
 
+// O nome original do arquivo vai embutido na própria URL (ver uploadImage.js),
+// no formato ".../<uuid>-<nome-original>". Aqui a gente extrai só o nome pra
+// mostrar pro usuário, sem precisar de uma coluna nova no banco.
+function fileNameFromUrl(url) {
+  try {
+    const last = decodeURIComponent(url.split("/").pop() || "arquivo");
+    return last.replace(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-/i, "");
+  } catch {
+    return "arquivo";
+  }
+}
+
+const FILE_ICONS = {
+  pdf: "📕",
+  csv: "📊",
+  xls: "📊",
+  xlsx: "📊",
+  txt: "📄",
+  doc: "📝",
+  docx: "📝",
+  ppt: "📙",
+  pptx: "📙",
+  zip: "🗜️",
+};
+
+function FileMessage({ url, isOwn }) {
+  const name = fileNameFromUrl(url);
+  const ext = name.split(".").pop()?.toLowerCase() || "";
+  const icon = FILE_ICONS[ext] || "📎";
+
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      download={name}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        width: 210,
+        padding: "6px 4px",
+        textDecoration: "none",
+        color: isOwn ? "var(--bubble-own-text)" : "var(--bubble-other-text)",
+      }}
+    >
+      <span style={{ fontSize: 24, flexShrink: 0 }}>{icon}</span>
+      <span
+        style={{
+          fontSize: 13,
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          whiteSpace: "nowrap",
+          minWidth: 0,
+        }}
+      >
+        {name}
+      </span>
+    </a>
+  );
+}
+
 const MENU_WIDTH = 180;
 
 export default function MessageBubble({ message, isOwn, canDeleteForEveryone, onHideForMe, onDeleteForEveryone }) {
@@ -18,6 +80,7 @@ export default function MessageBubble({ message, isOwn, canDeleteForEveryone, on
   const menuRef = useRef(null);
   const isImage = message.type === "image" && message.fileUrl;
   const isAudio = message.type === "audio" && message.fileUrl;
+  const isFile = message.type === "file" && message.fileUrl;
 
   // Fecha o menu se a pessoa tocar/clicar em qualquer outro lugar da tela,
   // ou rolar a conversa (já que o menu é posicionado "fixed").
@@ -93,7 +156,7 @@ export default function MessageBubble({ message, isOwn, canDeleteForEveryone, on
               style={{
                 background: isOwn ? "var(--bubble-own-bg)" : "var(--bubble-other-bg)",
                 color: isOwn ? "var(--bubble-own-text)" : "var(--bubble-other-text)",
-                padding: isImage || isAudio ? 4 : "8px 12px",
+                padding: isImage || isAudio || isFile ? 4 : "8px 12px",
                 borderRadius: 12,
                 minWidth: 0,
                 fontSize: 14,
@@ -109,6 +172,8 @@ export default function MessageBubble({ message, isOwn, canDeleteForEveryone, on
                 />
               ) : isAudio ? (
                 <AudioMessage src={message.fileUrl} isOwn={isOwn} />
+              ) : isFile ? (
+                <FileMessage url={message.fileUrl} isOwn={isOwn} />
               ) : (
                 message.content
               )}

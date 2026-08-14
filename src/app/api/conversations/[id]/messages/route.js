@@ -28,7 +28,7 @@ export async function POST(request, { params }) {
 
   const { content, type = "text", fileUrl } = await request.json();
 
-  if (type === "image" || type === "audio") {
+  if (type === "image" || type === "audio" || type === "file") {
     if (!fileUrl) {
       return NextResponse.json({ error: "Arquivo inválido." }, { status: 400 });
     }
