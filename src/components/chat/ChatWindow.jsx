@@ -5,6 +5,8 @@ import { useAuth } from "@/context/AuthContext.jsx";
 import { getSupabaseBrowserClient } from "@/lib/supabaseClient";
 import MessageBubble from "./MessageBubble.jsx";
 import MessageInput from "./MessageInput.jsx";
+import CallAudioSettingsModal from "./CallAudioSettingsModal.jsx";
+import { useCall } from "@/context/CallContext.jsx";
 
 const NEAR_BOTTOM_THRESHOLD = 100;
 
@@ -15,7 +17,9 @@ export default function ChatWindow({ conversation, onHideConversation, onBack, o
   const [isAdmin, setIsAdmin] = useState(false);
   const [participants, setParticipants] = useState([]);
   const [replyTo, setReplyTo] = useState(null);
+  const [showAudioSettings, setShowAudioSettings] = useState(false);
   const { user } = useAuth();
+  const call = useCall();
   const bottomRef = useRef(null);
   const scrollContainerRef = useRef(null);
   const channelRef = useRef(null);
@@ -276,6 +280,21 @@ export default function ChatWindow({ conversation, onHideConversation, onBack, o
           </p>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+          {!conversation.isGroup && (
+            <>
+              <button
+                className="icon-button"
+                onClick={() => call.startCall(conversation)}
+                disabled={call.callState !== "idle"}
+                title="Chamada de voz"
+              >
+                📞
+              </button>
+              <button className="icon-button" onClick={() => setShowAudioSettings(true)} title="Áudio e som">
+                ⚙️
+              </button>
+            </>
+          )}
           {conversation.isGroup && (
             <button className="icon-button mobile-only" onClick={onOpenParticipants} title="Ver participantes">
               👥
@@ -345,6 +364,7 @@ export default function ChatWindow({ conversation, onHideConversation, onBack, o
         replyTo={replyTo}
         onCancelReply={() => setReplyTo(null)}
       />
+      {showAudioSettings && <CallAudioSettingsModal onClose={() => setShowAudioSettings(false)} />}
     </div>
   );
 }

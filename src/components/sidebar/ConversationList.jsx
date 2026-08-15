@@ -1,6 +1,6 @@
 import ConversationItem from "./ConversationItem.jsx";
 
-export default function ConversationList({ conversations, activeId, onSelect, onNewGroup }) {
+export default function ConversationList({ conversations, activeId, onSelect, onNewGroup, onNewConversation }) {
   return (
     <div className="sidebar">
       <div
@@ -10,10 +10,16 @@ export default function ConversationList({ conversations, activeId, onSelect, on
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
+          gap: 8,
         }}
       >
         <p style={{ fontWeight: 500, fontSize: 16, margin: 0 }}>Conversas</p>
-        <button onClick={onNewGroup} title="Criar grupo">+ Grupo</button>
+        <div style={{ display: "flex", gap: 6 }}>
+          <button onClick={onNewConversation} title="Iniciar conversa privada">
+            + Conversa
+          </button>
+          <button onClick={onNewGroup} title="Criar grupo">+ Grupo</button>
+        </div>
       </div>
       <div style={{ flex: 1, overflowY: "auto" }}>
         {conversations.length === 0 && (

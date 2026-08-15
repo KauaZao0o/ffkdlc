@@ -71,3 +71,54 @@ export function playChime() {
     console.error("Não foi possível tocar o som de notificação:", err);
   }
 }
+
+// Toque de chamada: dois tons mais graves e mais longos que o "ding" de
+// mensagem, repetindo em loop - bem diferente do som de notificação normal,
+// pra dar pra distinguir "chegou mensagem" de "tem alguém ligando".
+function scheduleRingBurst(ctx) {
+  const now = ctx.currentTime;
+
+  function tone(freq, start, duration) {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = "sine";
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(0, now + start);
+    gain.gain.linearRampToValueAtTime(0.25, now + start + 0.03);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + start + duration);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(now + start);
+    osc.stop(now + start + duration + 0.05);
+  }
+
+  tone(523.25, 0, 0.35); // Dó
+  tone(659.25, 0.4, 0.35); // Mi
+}
+
+// Começa a tocar o toque de chamada em loop (repete a cada 1.6s) e devolve
+// uma função pra parar. Usado enquanto a chamada está "chamando" ou
+// "tocando" (ringing) - para assim que atende, recusa ou cancela.
+export function startRingtone() {
+  try {
+    const ctx = getAudioContext();
+    if (!ctx) return () => {};
+
+    const begin = () => scheduleRingBurst(ctx);
+
+    if (ctx.state === "suspended") {
+      ctx.resume().then(begin).catch(() => {});
+    } else {
+      begin();
+    }
+
+    const interval = setInterval(() => {
+      if (ctx.state !== "suspended") scheduleRingBurst(ctx);
+    }, 1600);
+
+    return () => clearInterval(interval);
+  } catch (err) {
+    console.error("Não foi possível tocar o toque de chamada:", err);
+    return () => {};
+  }
+}
