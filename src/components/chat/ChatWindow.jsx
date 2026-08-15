@@ -296,9 +296,33 @@ export default function ChatWindow({ conversation, onHideConversation, onBack, o
             </>
           )}
           {conversation.isGroup && (
-            <button className="icon-button mobile-only" onClick={onOpenParticipants} title="Ver participantes">
-              👥
-            </button>
+            <>
+              {(() => {
+                const inThisCall = call.groupCallConversation?.id === conversation.id && call.groupCallState === "active";
+                const banner = call.groupCallBanners?.[conversation.id];
+                const busy = call.callState !== "idle" || (call.groupCallState !== "idle" && !inThisCall);
+                return (
+                  <button
+                    className="icon-button"
+                    onClick={() => call.joinGroupCall(conversation)}
+                    disabled={busy || inThisCall}
+                    title={
+                      inThisCall
+                        ? "Você está na chamada"
+                        : banner
+                        ? `Entrar na chamada (${banner.count} na sala)`
+                        : "Iniciar chamada de voz em grupo"
+                    }
+                    style={inThisCall ? { background: "var(--success)", color: "white" } : undefined}
+                  >
+                    📞{banner && !inThisCall ? ` ${banner.count}` : ""}
+                  </button>
+                );
+              })()}
+              <button className="icon-button mobile-only" onClick={onOpenParticipants} title="Ver participantes">
+                👥
+              </button>
+            </>
           )}
           <button className="hide-conversation-btn" onClick={handleHideConversation} title="Apagar essa conversa só para você">
             Apagar para mim

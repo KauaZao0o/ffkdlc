@@ -3,7 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabaseClient";
 import { buildAudioConstraints, getPreferredSpeaker } from "@/lib/callDevices";
-import { startRingtone } from "@/lib/sound";
+import { startRingtone, playChime } from "@/lib/sound";
 import { useSound } from "@/context/SoundContext.jsx";
 
 const ICE_SERVERS = [
@@ -90,6 +90,37 @@ export function CallProvider({ user, conversations, children }) {
     userRef.current = user;
   }, [user]);
 
+  // ---------- Chamada em GRUPO (mesh WebRTC - todo mundo conecta com todo
+  // mundo diretamente, sem servidor central de mídia) ----------
+  //
+  // Diferente da chamada 1-a-1 (que tem um "ligando/tocando/atendeu"), a
+  // chamada em grupo funciona como uma "sala": quem entra primeiro começa a
+  // sala, e qualquer outro membro do grupo pode entrar a qualquer momento
+  // enquanto ela estiver rolando - não existe um "aceitar/recusar" por
+  // pessoa. A lista de quem está na sala é mantida via Presence do Supabase
+  // Realtime (cada participante "se marca" como presente no canal da
+  // conversa), o que também é o que permite mostrar "chamada em andamento"
+  // em qualquer grupo, mesmo pra quem ainda não entrou.
+  const [groupCallState, setGroupCallState] = useState("idle"); // idle | active
+  const [groupCallConversation, setGroupCallConversation] = useState(null); // {id, name}
+  const [groupCallPeers, setGroupCallPeers] = useState([]); // [{id, username, avatarColor, avatarUrl, connected}]
+  const [groupIsMuted, setGroupIsMuted] = useState(false);
+  const [groupDuration, setGroupDuration] = useState(0);
+  // {[conversationId]: {count, names, conversationName}} - permite mostrar um
+  // aviso de "chamada em andamento" em QUALQUER grupo, mesmo um que a pessoa
+  // não entrou (e nem estava olhando quando a chamada começou).
+  const [groupCallBanners, setGroupCallBanners] = useState({});
+
+  const groupPcsRef = useRef(new Map()); // peerId -> RTCPeerConnection
+  const groupAudioElsRef = useRef(new Map()); // peerId -> elemento <audio>
+  const groupPendingCandidatesRef = useRef(new Map()); // peerId -> candidatos ICE recebidos cedo demais
+  const groupDisconnectTimersRef = useRef(new Map()); // peerId -> timeout de tolerância antes de remover
+  const groupLocalStreamRef = useRef(null);
+  const groupConversationIdRef = useRef(null);
+  const groupDurationIntervalRef = useRef(null);
+  const groupCallStateRef = useRef("idle");
+  const groupIsMutedRef = useRef(false);
+
   function stopRingtone() {
     stopRingtoneRef.current?.();
     stopRingtoneRef.current = null;
@@ -152,6 +183,152 @@ export function CallProvider({ user, conversations, children }) {
       event,
       payload: { from: userRef.current.id, ...payload },
     });
+  }
+
+  // ---------- Helpers da chamada em grupo ----------
+
+  // Atualiza (ou cria) a entrada de um participante na lista exibida na
+  // tela, sem apagar campos que já tinham sido preenchidos antes (ex: já
+  // sabíamos o username, e agora só a conexão ficou pronta).
+  function upsertGroupPeer(list, patch) {
+    const idx = list.findIndex((p) => p.id === patch.id);
+    if (idx === -1) {
+      return [...list, { id: patch.id, username: "…", avatarColor: "blue", avatarUrl: null, connected: false, ...patch }];
+    }
+    const next = [...list];
+    next[idx] = { ...next[idx], ...patch };
+    return next;
+  }
+
+  function createGroupPeerConnection(convId, peerId) {
+    const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS, iceCandidatePoolSize: 10 });
+
+    pc.onicecandidate = (e) => {
+      if (e.candidate) {
+        send(convId, "group-call-signal", { to: peerId, kind: "ice", candidate: e.candidate });
+      }
+    };
+
+    pc.ontrack = (e) => {
+      let audioEl = groupAudioElsRef.current.get(peerId);
+      if (!audioEl) {
+        audioEl = typeof Audio !== "undefined" ? new Audio() : null;
+        if (audioEl) groupAudioElsRef.current.set(peerId, audioEl);
+      }
+      if (audioEl) {
+        audioEl.srcObject = e.streams[0];
+        const preferredSpeaker = getPreferredSpeaker();
+        if (preferredSpeaker && audioEl.setSinkId) {
+          audioEl.setSinkId(preferredSpeaker).catch(() => {});
+        }
+        audioEl.play().catch(() => {});
+      }
+      setGroupCallPeers((prev) => upsertGroupPeer(prev, { id: peerId, connected: true }));
+    };
+
+    pc.onconnectionstatechange = () => {
+      if (pc.connectionState === "connected") {
+        clearTimeout(groupDisconnectTimersRef.current.get(peerId));
+        groupDisconnectTimersRef.current.delete(peerId);
+        setGroupCallPeers((prev) => upsertGroupPeer(prev, { id: peerId, connected: true }));
+      } else if (["disconnected", "failed", "closed"].includes(pc.connectionState)) {
+        // Dá uma chance de reconectar sozinho (instabilidade momentânea de
+        // rede) antes de tirar essa pessoa da tela de vez.
+        clearTimeout(groupDisconnectTimersRef.current.get(peerId));
+        groupDisconnectTimersRef.current.set(peerId, setTimeout(() => removeGroupPeer(peerId), 6000));
+      }
+    };
+
+    return pc;
+  }
+
+  async function flushGroupPendingCandidates(peerId) {
+    const pc = groupPcsRef.current.get(peerId);
+    if (!pc) return;
+    const queued = groupPendingCandidatesRef.current.get(peerId) || [];
+    for (const candidate of queued) {
+      try {
+        await pc.addIceCandidate(candidate);
+      } catch {
+        // ignora candidato inválido/atrasado
+      }
+    }
+    groupPendingCandidatesRef.current.delete(peerId);
+  }
+
+  function removeGroupPeer(peerId) {
+    groupPcsRef.current.get(peerId)?.close();
+    groupPcsRef.current.delete(peerId);
+
+    const audioEl = groupAudioElsRef.current.get(peerId);
+    if (audioEl) audioEl.srcObject = null;
+    groupAudioElsRef.current.delete(peerId);
+
+    groupPendingCandidatesRef.current.delete(peerId);
+    clearTimeout(groupDisconnectTimersRef.current.get(peerId));
+    groupDisconnectTimersRef.current.delete(peerId);
+
+    setGroupCallPeers((prev) => prev.filter((p) => p.id !== peerId));
+  }
+
+  // Cria a conexão com um novo participante e manda uma oferta pra ele -
+  // usado quando EU sou quem "puxa" a conexão (ver a regra de desempate na
+  // sincronização de presença, mais abaixo).
+  async function initiateGroupOffer(convId, peerId, meta) {
+    const channel = channelsRef.current.get(convId);
+    if (!channel || !groupLocalStreamRef.current) return;
+
+    const pc = createGroupPeerConnection(convId, peerId);
+    groupPcsRef.current.set(peerId, pc);
+    groupLocalStreamRef.current.getTracks().forEach((t) => pc.addTrack(t, groupLocalStreamRef.current));
+    await boostAudioBitrate(pc);
+
+    setGroupCallPeers((prev) =>
+      upsertGroupPeer(prev, {
+        id: peerId,
+        username: meta?.username,
+        avatarColor: meta?.avatarColor,
+        avatarUrl: meta?.avatarUrl,
+        connected: false,
+      })
+    );
+
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+    send(convId, "group-call-signal", {
+      to: peerId,
+      kind: "offer",
+      sdp: offer,
+      username: userRef.current.username,
+      avatarColor: userRef.current.avatarColor,
+      avatarUrl: userRef.current.avatarUrl,
+    });
+  }
+
+  function cleanupGroupCall() {
+    clearInterval(groupDurationIntervalRef.current);
+    for (const timer of groupDisconnectTimersRef.current.values()) clearTimeout(timer);
+    groupDisconnectTimersRef.current.clear();
+
+    for (const pc of groupPcsRef.current.values()) pc.close();
+    groupPcsRef.current.clear();
+
+    for (const audioEl of groupAudioElsRef.current.values()) audioEl.srcObject = null;
+    groupAudioElsRef.current.clear();
+
+    groupPendingCandidatesRef.current.clear();
+    groupLocalStreamRef.current?.getTracks().forEach((t) => t.stop());
+    groupLocalStreamRef.current = null;
+
+    groupCallStateRef.current = "idle";
+    groupIsMutedRef.current = false;
+    groupConversationIdRef.current = null;
+
+    setGroupCallState("idle");
+    setGroupCallConversation(null);
+    setGroupCallPeers([]);
+    setGroupIsMuted(false);
+    setGroupDuration(0);
   }
 
   function createPeerConnection(convId) {
@@ -259,7 +436,7 @@ export function CallProvider({ user, conversations, children }) {
   // Liga pra outra pessoa de uma conversa privada específica.
   const startCall = useCallback(async (conversation) => {
     if (!conversation || conversation.isGroup) return;
-    if (callStateRef.current !== "idle") return;
+    if (callStateRef.current !== "idle" || groupCallStateRef.current !== "idle") return;
 
     const peer = conversation.participants?.[0];
     if (!peer) {
@@ -360,17 +537,128 @@ export function CallProvider({ user, conversations, children }) {
     setIsMuted(nextMuted);
   }, []);
 
-  // Assina o canal de sinalização de TODA conversa privada da pessoa ao
-  // mesmo tempo (não só da que está aberta na tela) - é isso que faz uma
-  // ligação chegar mesmo estando em outra conversa. Reage à lista de
-  // conversas mudando (entrar numa conversa nova, por exemplo), mas só
-  // cria/remove canal para o que realmente mudou - a lista chega de novo a
-  // cada poll (a cada alguns segundos) mesmo sem nada ter mudado de fato.
+  // Entra na "sala" de chamada em grupo de uma conversa - seja começando
+  // ela do zero (ninguém mais lá ainda) ou entrando numa que já está
+  // rolando. Os dois casos são o mesmo código: só marcar presença no canal
+  // já é suficiente pra sincronizar com quem estiver lá.
+  const joinGroupCall = useCallback(async (conversation) => {
+    if (!conversation?.isGroup) return;
+    if (callStateRef.current !== "idle" || groupCallStateRef.current !== "idle") return;
+
+    const channel = channelsRef.current.get(conversation.id);
+    if (!channel) {
+      alert("Canal de chamada indisponível - tente novamente em instantes.");
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: buildAudioConstraints() });
+      groupLocalStreamRef.current = stream;
+      groupConversationIdRef.current = conversation.id;
+      setGroupCallPeers([]);
+      setGroupIsMuted(false);
+      groupIsMutedRef.current = false;
+      setGroupCallConversation({ id: conversation.id, name: conversation.name });
+
+      // Se eu for o primeiro a entrar, avisa o grupo com um toque - quem já
+      // estava na sala nem precisa disso (a lista de presença já mostra).
+      const alreadyHasSomeoneInCall = Object.values(channel.presenceState())
+        .flat()
+        .some((p) => p.inCall);
+
+      groupCallStateRef.current = "active";
+      setGroupCallState("active");
+      setGroupDuration(0);
+      groupDurationIntervalRef.current = setInterval(() => setGroupDuration((d) => d + 1), 1000);
+
+      await channel.track({
+        inCall: true,
+        userId: userRef.current.id,
+        username: userRef.current.username,
+        avatarColor: userRef.current.avatarColor,
+        avatarUrl: userRef.current.avatarUrl,
+      });
+
+      if (!alreadyHasSomeoneInCall) {
+        send(conversation.id, "group-call-ring", { username: userRef.current.username });
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Não foi possível acessar o microfone. Confira as permissões do navegador para esse site.");
+      cleanupGroupCall();
+    }
+  }, []);
+
+  const leaveGroupCall = useCallback(() => {
+    if (groupCallStateRef.current === "idle") return;
+    channelsRef.current.get(groupConversationIdRef.current)?.untrack();
+    cleanupGroupCall();
+  }, []);
+
+  const toggleGroupMute = useCallback(() => {
+    const stream = groupLocalStreamRef.current;
+    if (!stream) return;
+    const nextMuted = !groupIsMutedRef.current;
+    stream.getAudioTracks().forEach((t) => (t.enabled = !nextMuted));
+    groupIsMutedRef.current = nextMuted;
+    setGroupIsMuted(nextMuted);
+  }, []);
+
+  // Troca o microfone em uso em TODAS as conexões da chamada em grupo de
+  // uma vez (uma faixa de áudio por peer, já que cada um tem sua própria
+  // RTCPeerConnection na topologia mesh).
+  const switchGroupMicrophone = useCallback(async (deviceId) => {
+    if (!groupLocalStreamRef.current) return;
+    try {
+      const newStream = await navigator.mediaDevices.getUserMedia({
+        audio: { ...buildAudioConstraints(), deviceId: deviceId ? { exact: deviceId } : undefined },
+      });
+      const newTrack = newStream.getAudioTracks()[0];
+      newTrack.enabled = !groupIsMutedRef.current;
+
+      for (const pc of groupPcsRef.current.values()) {
+        const sender = pc.getSenders().find((s) => s.track?.kind === "audio");
+        if (sender) await sender.replaceTrack(newTrack);
+      }
+
+      groupLocalStreamRef.current.getTracks().forEach((t) => t.stop());
+      groupLocalStreamRef.current = newStream;
+
+      for (const pc of groupPcsRef.current.values()) {
+        await boostAudioBitrate(pc);
+      }
+    } catch (err) {
+      console.error("Não foi possível trocar de microfone:", err);
+      alert("Não foi possível trocar de microfone.");
+    }
+  }, []);
+
+  // Troca o alto-falante em TODOS os elementos de áudio da chamada em
+  // grupo (um por participante conectado).
+  const switchGroupSpeaker = useCallback(async (deviceId) => {
+    const elements = Array.from(groupAudioElsRef.current.values());
+    if (elements.length === 0 || !elements[0]?.setSinkId) return;
+    for (const el of elements) {
+      try {
+        await el.setSinkId(deviceId || "");
+      } catch (err) {
+        console.error("Não foi possível trocar de alto-falante:", err);
+      }
+    }
+  }, []);
+
+  // Assina o canal de sinalização de TODA conversa da pessoa ao mesmo tempo
+  // (não só a que está aberta na tela) - privadas para chamada 1-a-1, e
+  // grupos para chamada em grupo + aviso de "chamada em andamento". Reage à
+  // lista de conversas mudando, mas só cria/remove canal para o que
+  // realmente mudou - a lista chega de novo a cada poll mesmo sem nada ter
+  // mudado de fato.
   useEffect(() => {
     if (!user) return;
 
     const supabase = getSupabaseBrowserClient();
-    const wantedIds = new Set((conversations || []).filter((c) => !c.isGroup).map((c) => c.id));
+    const list = conversations || [];
+    const wantedIds = new Set(list.map((c) => c.id));
     const current = channelsRef.current;
 
     for (const [id, channel] of current) {
@@ -380,16 +668,21 @@ export function CallProvider({ user, conversations, children }) {
       }
     }
 
-    wantedIds.forEach((id) => {
+    list.forEach((conv) => {
+      const id = conv.id;
       if (current.has(id)) return;
 
+      // A key de presença é o próprio userId - assim, se a pessoa tiver
+      // duas abas abertas, elas dividem a mesma "vaga" de presença em vez
+      // de aparecerem como duas pessoas na sala.
       const channel = supabase
-        .channel(`call-${id}`)
+        .channel(`call-${id}`, { config: { presence: { key: user.id } } })
         .on("broadcast", { event: "call-offer" }, ({ payload }) => {
           if (payload.from === user.id) return;
 
-          // Se já estiver em outra chamada, recusa automaticamente (ocupado).
-          if (callStateRef.current !== "idle") {
+          // Se já estiver em outra chamada (1-a-1 ou em grupo), recusa
+          // automaticamente (ocupado).
+          if (callStateRef.current !== "idle" || groupCallStateRef.current !== "idle") {
             channel.send({
               type: "broadcast",
               event: "call-reject",
@@ -445,6 +738,109 @@ export function CallProvider({ user, conversations, children }) {
           if (payload.from === user.id || payload.callId !== callIdRef.current) return;
           resetToIdle("Chamada encerrada.");
         })
+        // ---------- Chamada em grupo ----------
+        .on("broadcast", { event: "group-call-ring" }, ({ payload }) => {
+          if (payload.from === user.id) return;
+          // Só um "ding" simples de aviso - o aviso persistente de "chamada
+          // em andamento" vem da presença, não deste evento.
+          if (soundEnabledRef.current) playChime();
+        })
+        .on("broadcast", { event: "group-call-signal" }, async ({ payload }) => {
+          if (payload.to !== user.id) return;
+          if (groupCallStateRef.current !== "active" || groupConversationIdRef.current !== id) return;
+
+          if (payload.kind === "offer") {
+            let pc = groupPcsRef.current.get(payload.from);
+            if (!pc) {
+              pc = createGroupPeerConnection(id, payload.from);
+              groupPcsRef.current.set(payload.from, pc);
+              groupLocalStreamRef.current?.getTracks().forEach((t) => pc.addTrack(t, groupLocalStreamRef.current));
+              await boostAudioBitrate(pc);
+            }
+            await pc.setRemoteDescription(payload.sdp);
+            await flushGroupPendingCandidates(payload.from);
+            const answer = await pc.createAnswer();
+            await pc.setLocalDescription(answer);
+            setGroupCallPeers((prev) =>
+              upsertGroupPeer(prev, {
+                id: payload.from,
+                username: payload.username,
+                avatarColor: payload.avatarColor,
+                avatarUrl: payload.avatarUrl,
+              })
+            );
+            send(id, "group-call-signal", { to: payload.from, kind: "answer", sdp: answer });
+          } else if (payload.kind === "answer") {
+            const pc = groupPcsRef.current.get(payload.from);
+            if (pc) {
+              await pc.setRemoteDescription(payload.sdp);
+              await flushGroupPendingCandidates(payload.from);
+            }
+          } else if (payload.kind === "ice") {
+            const pc = groupPcsRef.current.get(payload.from);
+            if (pc && pc.remoteDescription) {
+              try {
+                await pc.addIceCandidate(payload.candidate);
+              } catch {
+                // ignora
+              }
+            } else {
+              const queued = groupPendingCandidatesRef.current.get(payload.from) || [];
+              queued.push(payload.candidate);
+              groupPendingCandidatesRef.current.set(payload.from, queued);
+            }
+          }
+        })
+        .on("presence", { event: "sync" }, () => {
+          const state = channel.presenceState();
+          const entries = Object.values(state).flat().filter((p) => p.inCall);
+
+          // Aviso de "chamada em andamento" - relevante só para grupos, e
+          // pra QUALQUER membro, esteja ele na chamada ou não.
+          if (conv.isGroup) {
+            setGroupCallBanners((prev) => {
+              const next = { ...prev };
+              if (entries.length > 0) {
+                next[id] = { count: entries.length, names: entries.map((e) => e.username), conversationName: conv.name };
+              } else {
+                delete next[id];
+              }
+              return next;
+            });
+          }
+
+          // Manutenção das conexões mesh - só relevante se EU estiver
+          // ativamente nessa sala agora.
+          if (groupCallStateRef.current === "active" && groupConversationIdRef.current === id) {
+            const myId = user.id;
+            const presentIds = new Set(entries.map((e) => e.userId).filter((pid) => pid !== myId));
+
+            presentIds.forEach((peerId) => {
+              if (groupPcsRef.current.has(peerId)) return;
+              const meta = entries.find((e) => e.userId === peerId);
+              // Regra de desempate simples pra ninguém mandar oferta pro
+              // outro ao mesmo tempo: quem tem o id "menor" (comparação de
+              // texto) inicia a conexão; o outro só espera a oferta chegar.
+              if (myId < peerId) {
+                initiateGroupOffer(id, peerId, meta);
+              } else {
+                setGroupCallPeers((prev) =>
+                  upsertGroupPeer(prev, {
+                    id: peerId,
+                    username: meta?.username,
+                    avatarColor: meta?.avatarColor,
+                    avatarUrl: meta?.avatarUrl,
+                    connected: false,
+                  })
+                );
+              }
+            });
+
+            for (const existingId of Array.from(groupPcsRef.current.keys())) {
+              if (!presentIds.has(existingId)) removeGroupPeer(existingId);
+            }
+          }
+        })
         .subscribe();
 
       current.set(id, channel);
@@ -462,6 +858,7 @@ export function CallProvider({ user, conversations, children }) {
       }
       channelsRef.current.clear();
       cleanupPeer();
+      cleanupGroupCall();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -480,6 +877,18 @@ export function CallProvider({ user, conversations, children }) {
     toggleMute,
     switchMicrophone,
     switchSpeaker,
+
+    groupCallState,
+    groupCallConversation,
+    groupCallPeers,
+    groupIsMuted,
+    groupDuration,
+    groupCallBanners,
+    joinGroupCall,
+    leaveGroupCall,
+    toggleGroupMute,
+    switchGroupMicrophone,
+    switchGroupSpeaker,
   };
 
   return <CallContext.Provider value={value}>{children}</CallContext.Provider>;

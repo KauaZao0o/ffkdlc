@@ -9,6 +9,8 @@ import { getSupabaseBrowserClient } from "@/lib/supabaseClient";
 import ConversationList from "@/components/sidebar/ConversationList.jsx";
 import ChatWindow from "@/components/chat/ChatWindow.jsx";
 import VoiceCallOverlay from "@/components/chat/VoiceCallOverlay.jsx";
+import GroupCallOverlay from "@/components/chat/GroupCallOverlay.jsx";
+import GroupCallBanners from "@/components/chat/GroupCallBanners.jsx";
 import ParticipantsList from "@/components/group/ParticipantsList.jsx";
 import CreateGroupModal from "@/components/group/CreateGroupModal.jsx";
 import NewConversationModal from "@/components/sidebar/NewConversationModal.jsx";
@@ -20,7 +22,13 @@ import Avatar from "@/components/common/Avatar.jsx";
 // conversa em que a ligação foi feita.
 function GlobalCallOverlay() {
   const call = useCall();
-  return <VoiceCallOverlay call={call} />;
+  return (
+    <>
+      <VoiceCallOverlay call={call} />
+      <GroupCallOverlay call={call} />
+      <GroupCallBanners call={call} />
+    </>
+  );
 }
 
 export default function ChatPage() {
