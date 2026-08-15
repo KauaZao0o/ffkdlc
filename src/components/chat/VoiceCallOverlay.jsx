@@ -1,12 +1,56 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import CallAudioSettingsModal from "./CallAudioSettingsModal.jsx";
 
 function formatCallDuration(totalSeconds) {
   const m = Math.floor(totalSeconds / 60).toString().padStart(2, "0");
   const s = (totalSeconds % 60).toString().padStart(2, "0");
   return `${m}:${s}`;
+}
+
+// <video> controlado imperativamente: srcObject não é uma prop comum do
+// React (é um MediaStream, não serializa), então atribui direto no
+// elemento sempre que o stream muda.
+function VideoTile({ stream, muted, label, mirrored }) {
+  const videoRef = useRef(null);
+
+  useEffect(() => {
+    if (videoRef.current) videoRef.current.srcObject = stream || null;
+  }, [stream]);
+
+  return (
+    <div style={{ position: "relative", width: "100%", height: "100%", background: "#000", borderRadius: 10, overflow: "hidden" }}>
+      <video
+        ref={videoRef}
+        autoPlay
+        playsInline
+        muted={muted}
+        style={{
+          width: "100%",
+          height: "100%",
+          objectFit: "cover",
+          transform: mirrored ? "scaleX(-1)" : "none",
+        }}
+      />
+      {label && (
+        <span
+          style={{
+            position: "absolute",
+            bottom: 6,
+            left: 8,
+            fontSize: 11,
+            color: "white",
+            background: "rgba(0,0,0,0.45)",
+            padding: "2px 6px",
+            borderRadius: 6,
+          }}
+        >
+          {label}
+        </span>
+      )}
+    </div>
+  );
 }
 
 export default function VoiceCallOverlay({ call }) {
@@ -22,8 +66,17 @@ export default function VoiceCallOverlay({ call }) {
     toggleMute,
     switchMicrophone,
     switchSpeaker,
+    localVideoOn,
+    localScreenSharing,
+    localVideoStream,
+    remoteVideoOn,
+    remoteScreenSharing,
+    remoteVideoStream,
+    toggleVideo,
+    toggleScreenShare,
   } = call;
   const [showAudioSettings, setShowAudioSettings] = useState(false);
+  const hasAnyVideo = localVideoOn || remoteVideoOn;
 
   if (callState === "idle") {
     return statusMessage ? (
@@ -192,6 +245,46 @@ export default function VoiceCallOverlay({ call }) {
         </button>
         <button
           type="button"
+          onClick={toggleVideo}
+          title={localScreenSharing ? "Câmera (pare o compartilhamento de tela primeiro)" : localVideoOn ? "Desligar câmera" : "Ligar câmera"}
+          disabled={localScreenSharing}
+          style={{
+            width: 30,
+            height: 30,
+            borderRadius: "50%",
+            border: "none",
+            background: localVideoOn ? "rgba(0,0,0,0.35)" : "rgba(255,255,255,0.25)",
+            color: "white",
+            fontSize: 14,
+            opacity: localScreenSharing ? 0.5 : 1,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          🎥
+        </button>
+        <button
+          type="button"
+          onClick={toggleScreenShare}
+          title={localScreenSharing ? "Parar compartilhamento de tela" : "Compartilhar tela"}
+          style={{
+            width: 30,
+            height: 30,
+            borderRadius: "50%",
+            border: "none",
+            background: localScreenSharing ? "rgba(0,0,0,0.35)" : "rgba(255,255,255,0.25)",
+            color: "white",
+            fontSize: 14,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          🖥️
+        </button>
+        <button
+          type="button"
           onClick={toggleMute}
           title={isMuted ? "Ativar microfone" : "Silenciar microfone"}
           style={{
@@ -231,6 +324,52 @@ export default function VoiceCallOverlay({ call }) {
         </button>
       </div>
       </div>
+
+      {hasAnyVideo && (
+        <div
+          style={{
+            position: "fixed",
+            bottom: 16,
+            right: 16,
+            zIndex: 60,
+            width: "min(320px, 80vw)",
+            height: "min(240px, 60vw)",
+            boxShadow: "0 8px 24px rgba(0,0,0,0.35)",
+            borderRadius: 12,
+            overflow: "hidden",
+          }}
+        >
+          {remoteVideoOn ? (
+            <VideoTile
+              stream={remoteVideoStream}
+              label={`${peerName}${remoteScreenSharing ? " · tela" : ""}`}
+            />
+          ) : (
+            <div
+              style={{
+                width: "100%",
+                height: "100%",
+                background: "var(--surface)",
+                border: "1px solid var(--border)",
+                borderRadius: 12,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: 13,
+                color: "var(--text-muted)",
+              }}
+            >
+              {peerName} sem vídeo
+            </div>
+          )}
+
+          {localVideoOn && (
+            <div style={{ position: "absolute", bottom: 8, right: 8, width: "30%", aspectRatio: "4 / 3" }}>
+              <VideoTile stream={localVideoStream} muted mirrored={!localScreenSharing} label="Você" />
+            </div>
+          )}
+        </div>
+      )}
 
       {showAudioSettings && (
         <CallAudioSettingsModal

@@ -53,6 +53,15 @@ export function CallProvider({ user, conversations, children }) {
   const [duration, setDuration] = useState(0);
   const [statusMessage, setStatusMessage] = useState("");
 
+  // Vídeo/tela na chamada 1-a-1. "Local" é o que EU estou mandando (câmera
+  // ou tela); "remote" é o que a outra pessoa está mandando pra mim.
+  const [localVideoOn, setLocalVideoOn] = useState(false);
+  const [localScreenSharing, setLocalScreenSharing] = useState(false);
+  const [localVideoStream, setLocalVideoStream] = useState(null);
+  const [remoteVideoOn, setRemoteVideoOn] = useState(false);
+  const [remoteScreenSharing, setRemoteScreenSharing] = useState(false);
+  const [remoteVideoStream, setRemoteVideoStream] = useState(null);
+
   const { enabled: soundEnabled } = useSound();
 
   // canais de sinalização: um por conversa privada (call-<conversationId>),
@@ -71,6 +80,14 @@ export function CallProvider({ user, conversations, children }) {
   const ringTimeoutRef = useRef(null);
   const disconnectGraceRef = useRef(null);
   const stopRingtoneRef = useRef(null);
+
+  // Vídeo 1-a-1: o "slot" de vídeo (RTCRtpSender) é criado junto com a
+  // conexão, mesmo numa chamada só de voz - assim ligar a câmera ou
+  // compartilhar tela depois não exige renegociar a chamada, só trocar a
+  // faixa que está sendo enviada nesse slot (câmera, tela, ou nada).
+  const videoSenderRef = useRef(null);
+  const localVideoTrackRef = useRef(null);
+  const videoModeRef = useRef("off"); // "off" | "camera" | "screen"
 
   // Refs "espelhando" o estado mais recente - os handlers dos canais são
   // criados uma vez (só quando a lista de conversas muda) e não podem
@@ -111,6 +128,13 @@ export function CallProvider({ user, conversations, children }) {
   // não entrou (e nem estava olhando quando a chamada começou).
   const [groupCallBanners, setGroupCallBanners] = useState({});
 
+  // Vídeo/tela na chamada em grupo - assim como no áudio, uma única faixa
+  // local (câmera OU tela, nunca as duas) é replicada pra TODAS as conexões
+  // da malha de uma vez.
+  const [groupLocalVideoOn, setGroupLocalVideoOn] = useState(false);
+  const [groupLocalScreenSharing, setGroupLocalScreenSharing] = useState(false);
+  const [groupLocalVideoStream, setGroupLocalVideoStream] = useState(null);
+
   const groupPcsRef = useRef(new Map()); // peerId -> RTCPeerConnection
   const groupAudioElsRef = useRef(new Map()); // peerId -> elemento <audio>
   const groupPendingCandidatesRef = useRef(new Map()); // peerId -> candidatos ICE recebidos cedo demais
@@ -120,6 +144,12 @@ export function CallProvider({ user, conversations, children }) {
   const groupDurationIntervalRef = useRef(null);
   const groupCallStateRef = useRef("idle");
   const groupIsMutedRef = useRef(false);
+
+  // peerId -> RTCRtpSender do slot de vídeo daquela conexão específica (uma
+  // por peer, já que cada um tem sua própria RTCPeerConnection na malha).
+  const groupVideoSendersRef = useRef(new Map());
+  const groupLocalVideoTrackRef = useRef(null);
+  const groupVideoModeRef = useRef("off"); // "off" | "camera" | "screen"
 
   function stopRingtone() {
     stopRingtoneRef.current?.();
@@ -165,6 +195,17 @@ export function CallProvider({ user, conversations, children }) {
     setIsMuted(false);
     setDuration(0);
     setConversationId(null);
+
+    localVideoTrackRef.current?.stop();
+    localVideoTrackRef.current = null;
+    videoSenderRef.current = null;
+    videoModeRef.current = "off";
+    setLocalVideoOn(false);
+    setLocalScreenSharing(false);
+    setLocalVideoStream(null);
+    setRemoteVideoOn(false);
+    setRemoteScreenSharing(false);
+    setRemoteVideoStream(null);
   }
 
   function resetToIdle(message) {
@@ -193,7 +234,20 @@ export function CallProvider({ user, conversations, children }) {
   function upsertGroupPeer(list, patch) {
     const idx = list.findIndex((p) => p.id === patch.id);
     if (idx === -1) {
-      return [...list, { id: patch.id, username: "…", avatarColor: "blue", avatarUrl: null, connected: false, ...patch }];
+      return [
+        ...list,
+        {
+          id: patch.id,
+          username: "…",
+          avatarColor: "blue",
+          avatarUrl: null,
+          connected: false,
+          videoStream: null,
+          videoOn: false,
+          screenSharing: false,
+          ...patch,
+        },
+      ];
     }
     const next = [...list];
     next[idx] = { ...next[idx], ...patch };
@@ -203,6 +257,15 @@ export function CallProvider({ user, conversations, children }) {
   function createGroupPeerConnection(convId, peerId) {
     const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS, iceCandidatePoolSize: 10 });
 
+    // Slot de vídeo já criado de cara (mesmo numa chamada só de voz) -
+    // ligar câmera/tela depois só troca a faixa desse slot, sem precisar
+    // renegociar a conexão com essa pessoa.
+    const videoTransceiver = pc.addTransceiver("video", { direction: "sendrecv" });
+    groupVideoSendersRef.current.set(peerId, videoTransceiver.sender);
+    if (groupLocalVideoTrackRef.current) {
+      videoTransceiver.sender.replaceTrack(groupLocalVideoTrackRef.current).catch(() => {});
+    }
+
     pc.onicecandidate = (e) => {
       if (e.candidate) {
         send(convId, "group-call-signal", { to: peerId, kind: "ice", candidate: e.candidate });
@@ -210,6 +273,11 @@ export function CallProvider({ user, conversations, children }) {
     };
 
     pc.ontrack = (e) => {
+      if (e.track.kind === "video") {
+        setGroupCallPeers((prev) => upsertGroupPeer(prev, { id: peerId, videoStream: new MediaStream([e.track]) }));
+        return;
+      }
+
       let audioEl = groupAudioElsRef.current.get(peerId);
       if (!audioEl) {
         audioEl = typeof Audio !== "undefined" ? new Audio() : null;
@@ -231,6 +299,18 @@ export function CallProvider({ user, conversations, children }) {
         clearTimeout(groupDisconnectTimersRef.current.get(peerId));
         groupDisconnectTimersRef.current.delete(peerId);
         setGroupCallPeers((prev) => upsertGroupPeer(prev, { id: peerId, connected: true }));
+
+        // Se eu já estava com câmera/tela ligada, a faixa já foi anexada
+        // acima (antes da oferta/resposta) - isso aqui é só pra pessoa que
+        // acabou de conectar saber o que é (câmera ou tela) pra rotular
+        // certo na tela dela.
+        if (groupVideoModeRef.current !== "off") {
+          send(convId, "group-call-video-state", {
+            to: peerId,
+            videoOn: true,
+            screenSharing: groupVideoModeRef.current === "screen",
+          });
+        }
       } else if (["disconnected", "failed", "closed"].includes(pc.connectionState)) {
         // Dá uma chance de reconectar sozinho (instabilidade momentânea de
         // rede) antes de tirar essa pessoa da tela de vez.
@@ -259,6 +339,7 @@ export function CallProvider({ user, conversations, children }) {
   function removeGroupPeer(peerId) {
     groupPcsRef.current.get(peerId)?.close();
     groupPcsRef.current.delete(peerId);
+    groupVideoSendersRef.current.delete(peerId);
 
     const audioEl = groupAudioElsRef.current.get(peerId);
     if (audioEl) audioEl.srcObject = null;
@@ -312,6 +393,7 @@ export function CallProvider({ user, conversations, children }) {
 
     for (const pc of groupPcsRef.current.values()) pc.close();
     groupPcsRef.current.clear();
+    groupVideoSendersRef.current.clear();
 
     for (const audioEl of groupAudioElsRef.current.values()) audioEl.srcObject = null;
     groupAudioElsRef.current.clear();
@@ -319,6 +401,13 @@ export function CallProvider({ user, conversations, children }) {
     groupPendingCandidatesRef.current.clear();
     groupLocalStreamRef.current?.getTracks().forEach((t) => t.stop());
     groupLocalStreamRef.current = null;
+
+    groupLocalVideoTrackRef.current?.stop();
+    groupLocalVideoTrackRef.current = null;
+    groupVideoModeRef.current = "off";
+    setGroupLocalVideoOn(false);
+    setGroupLocalScreenSharing(false);
+    setGroupLocalVideoStream(null);
 
     groupCallStateRef.current = "idle";
     groupIsMutedRef.current = false;
@@ -334,6 +423,12 @@ export function CallProvider({ user, conversations, children }) {
   function createPeerConnection(convId) {
     const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS, iceCandidatePoolSize: 10 });
 
+    // Slot de vídeo já criado de cara (mesmo numa chamada só de voz) -
+    // ligar câmera/tela depois só troca a faixa desse slot, sem precisar
+    // renegociar a chamada.
+    const videoTransceiver = pc.addTransceiver("video", { direction: "sendrecv" });
+    videoSenderRef.current = videoTransceiver.sender;
+
     pc.onicecandidate = (e) => {
       if (e.candidate) {
         send(convId, "call-ice", { to: peerIdRef.current, callId: callIdRef.current, candidate: e.candidate });
@@ -341,6 +436,10 @@ export function CallProvider({ user, conversations, children }) {
     };
 
     pc.ontrack = (e) => {
+      if (e.track.kind === "video") {
+        setRemoteVideoStream(new MediaStream([e.track]));
+        return;
+      }
       if (remoteAudioRef.current) {
         remoteAudioRef.current.srcObject = e.streams[0];
         const preferredSpeaker = getPreferredSpeaker();
@@ -430,6 +529,91 @@ export function CallProvider({ user, conversations, children }) {
       await remoteAudioRef.current.setSinkId(deviceId || "");
     } catch (err) {
       console.error("Não foi possível trocar de alto-falante:", err);
+    }
+  }, []);
+
+  // Troca a faixa de vídeo enviada (câmera, tela, ou nenhuma) no slot já
+  // existente na conexão - não precisa renegociar a chamada pra isso, já
+  // que o slot de vídeo é criado desde o início (ver createPeerConnection).
+  async function applyLocalVideoTrack(track, screenSharing) {
+    const sender = videoSenderRef.current;
+    if (sender) {
+      try {
+        await sender.replaceTrack(track);
+      } catch (err) {
+        console.error("Não foi possível atualizar o vídeo da chamada:", err);
+      }
+    }
+
+    const old = localVideoTrackRef.current;
+    if (old && old !== track) old.stop();
+    localVideoTrackRef.current = track;
+
+    if (track) {
+      setLocalVideoStream(new MediaStream([track]));
+      setLocalVideoOn(true);
+      setLocalScreenSharing(!!screenSharing);
+    } else {
+      setLocalVideoStream(null);
+      setLocalVideoOn(false);
+      setLocalScreenSharing(false);
+    }
+
+    const convId = conversationIdRef.current;
+    if (convId && peerIdRef.current) {
+      send(convId, "call-video-state", { to: peerIdRef.current, videoOn: !!track, screenSharing: !!screenSharing });
+    }
+  }
+
+  // Liga/desliga a câmera durante a chamada. Se a tela estiver sendo
+  // compartilhada, ligar a câmera troca pra ela (só um vídeo por vez).
+  const toggleVideo = useCallback(async () => {
+    if (callStateRef.current !== "connected") return;
+
+    if (videoModeRef.current === "camera") {
+      await applyLocalVideoTrack(null, false);
+      videoModeRef.current = "off";
+      return;
+    }
+
+    try {
+      const camStream = await navigator.mediaDevices.getUserMedia({
+        video: { width: { ideal: 640 }, height: { ideal: 480 } },
+      });
+      const track = camStream.getVideoTracks()[0];
+      await applyLocalVideoTrack(track, false);
+      videoModeRef.current = "camera";
+    } catch (err) {
+      console.error("Não foi possível acessar a câmera:", err);
+      alert("Não foi possível acessar a câmera. Confira as permissões do navegador para esse site.");
+    }
+  }, []);
+
+  // Liga/desliga o compartilhamento de tela. Detecta sozinho quando a
+  // pessoa clica em "Parar apresentação" no controle nativo do navegador.
+  const toggleScreenShare = useCallback(async () => {
+    if (callStateRef.current !== "connected") return;
+
+    if (videoModeRef.current === "screen") {
+      await applyLocalVideoTrack(null, false);
+      videoModeRef.current = "off";
+      return;
+    }
+
+    try {
+      const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+      const track = screenStream.getVideoTracks()[0];
+      track.onended = () => {
+        if (videoModeRef.current === "screen") {
+          applyLocalVideoTrack(null, false);
+          videoModeRef.current = "off";
+        }
+      };
+      await applyLocalVideoTrack(track, true);
+      videoModeRef.current = "screen";
+    } catch (err) {
+      // "NotAllowedError" é só a pessoa cancelando o seletor - não é erro.
+      if (err?.name !== "NotAllowedError") console.error("Não foi possível compartilhar a tela:", err);
     }
   }, []);
 
@@ -647,6 +831,86 @@ export function CallProvider({ user, conversations, children }) {
     }
   }, []);
 
+  // Troca a faixa de vídeo enviada (câmera, tela, ou nenhuma) em TODAS as
+  // conexões da malha de uma vez - cada uma já tem seu próprio slot de
+  // vídeo desde que conectou (ver createGroupPeerConnection), então trocar
+  // a faixa não derruba nem precisa renegociar nenhuma delas.
+  async function applyGroupLocalVideoTrack(track, screenSharing) {
+    for (const sender of groupVideoSendersRef.current.values()) {
+      try {
+        await sender.replaceTrack(track);
+      } catch (err) {
+        console.error("Não foi possível atualizar o vídeo da chamada:", err);
+      }
+    }
+
+    const old = groupLocalVideoTrackRef.current;
+    if (old && old !== track) old.stop();
+    groupLocalVideoTrackRef.current = track;
+
+    if (track) {
+      setGroupLocalVideoStream(new MediaStream([track]));
+      setGroupLocalVideoOn(true);
+      setGroupLocalScreenSharing(!!screenSharing);
+    } else {
+      setGroupLocalVideoStream(null);
+      setGroupLocalVideoOn(false);
+      setGroupLocalScreenSharing(false);
+    }
+
+    const convId = groupConversationIdRef.current;
+    if (convId) {
+      send(convId, "group-call-video-state", { videoOn: !!track, screenSharing: !!screenSharing });
+    }
+  }
+
+  const toggleGroupVideo = useCallback(async () => {
+    if (groupCallStateRef.current !== "active") return;
+
+    if (groupVideoModeRef.current === "camera") {
+      await applyGroupLocalVideoTrack(null, false);
+      groupVideoModeRef.current = "off";
+      return;
+    }
+
+    try {
+      const camStream = await navigator.mediaDevices.getUserMedia({
+        video: { width: { ideal: 640 }, height: { ideal: 480 } },
+      });
+      const track = camStream.getVideoTracks()[0];
+      await applyGroupLocalVideoTrack(track, false);
+      groupVideoModeRef.current = "camera";
+    } catch (err) {
+      console.error("Não foi possível acessar a câmera:", err);
+      alert("Não foi possível acessar a câmera. Confira as permissões do navegador para esse site.");
+    }
+  }, []);
+
+  const toggleGroupScreenShare = useCallback(async () => {
+    if (groupCallStateRef.current !== "active") return;
+
+    if (groupVideoModeRef.current === "screen") {
+      await applyGroupLocalVideoTrack(null, false);
+      groupVideoModeRef.current = "off";
+      return;
+    }
+
+    try {
+      const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+      const track = screenStream.getVideoTracks()[0];
+      track.onended = () => {
+        if (groupVideoModeRef.current === "screen") {
+          applyGroupLocalVideoTrack(null, false);
+          groupVideoModeRef.current = "off";
+        }
+      };
+      await applyGroupLocalVideoTrack(track, true);
+      groupVideoModeRef.current = "screen";
+    } catch (err) {
+      if (err?.name !== "NotAllowedError") console.error("Não foi possível compartilhar a tela:", err);
+    }
+  }, []);
+
   // Assina o canal de sinalização de TODA conversa da pessoa ao mesmo tempo
   // (não só a que está aberta na tela) - privadas para chamada 1-a-1, e
   // grupos para chamada em grupo + aviso de "chamada em andamento". Reage à
@@ -738,12 +1002,31 @@ export function CallProvider({ user, conversations, children }) {
           if (payload.from === user.id || payload.callId !== callIdRef.current) return;
           resetToIdle("Chamada encerrada.");
         })
+        .on("broadcast", { event: "call-video-state" }, ({ payload }) => {
+          if (payload.from === user.id || payload.to !== user.id) return;
+          if (callStateRef.current !== "connected" || conversationIdRef.current !== id) return;
+          setRemoteVideoOn(!!payload.videoOn);
+          setRemoteScreenSharing(!!payload.screenSharing);
+          if (!payload.videoOn) setRemoteVideoStream(null);
+        })
         // ---------- Chamada em grupo ----------
         .on("broadcast", { event: "group-call-ring" }, ({ payload }) => {
           if (payload.from === user.id) return;
           // Só um "ding" simples de aviso - o aviso persistente de "chamada
           // em andamento" vem da presença, não deste evento.
           if (soundEnabledRef.current) playChime();
+        })
+        .on("broadcast", { event: "group-call-video-state" }, ({ payload }) => {
+          if (payload.from === user.id) return;
+          if (payload.to && payload.to !== user.id) return;
+          setGroupCallPeers((prev) =>
+            upsertGroupPeer(prev, {
+              id: payload.from,
+              videoOn: !!payload.videoOn,
+              screenSharing: !!payload.screenSharing,
+              ...(payload.videoOn ? {} : { videoStream: null }),
+            })
+          );
         })
         .on("broadcast", { event: "group-call-signal" }, async ({ payload }) => {
           if (payload.to !== user.id) return;
@@ -877,6 +1160,14 @@ export function CallProvider({ user, conversations, children }) {
     toggleMute,
     switchMicrophone,
     switchSpeaker,
+    localVideoOn,
+    localScreenSharing,
+    localVideoStream,
+    remoteVideoOn,
+    remoteScreenSharing,
+    remoteVideoStream,
+    toggleVideo,
+    toggleScreenShare,
 
     groupCallState,
     groupCallConversation,
@@ -889,6 +1180,11 @@ export function CallProvider({ user, conversations, children }) {
     toggleGroupMute,
     switchGroupMicrophone,
     switchGroupSpeaker,
+    groupLocalVideoOn,
+    groupLocalScreenSharing,
+    groupLocalVideoStream,
+    toggleGroupVideo,
+    toggleGroupScreenShare,
   };
 
   return <CallContext.Provider value={value}>{children}</CallContext.Provider>;
