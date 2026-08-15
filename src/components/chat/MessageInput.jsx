@@ -517,11 +517,7 @@ export default function MessageInput({ channelRef, userId, conversationId, parti
             <textarea
               ref={textareaRef}
               rows={1}
-              placeholder={
-                uploading
-                  ? "Enviando..."
-                  : "Digite uma mensagem (@ para mencionar, cole uma imagem aqui)"
-              }
+              placeholder={uploading ? "Enviando..." : "Digite uma mensagem"}
               value={text}
               onChange={handleChange}
               onKeyDown={handleKeyDown}
