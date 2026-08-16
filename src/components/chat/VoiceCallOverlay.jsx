@@ -1,7 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import CallAudioSettingsModal from "./CallAudioSettingsModal.jsx";
+import ScreenShareVideo from "./ScreenShareVideo.jsx";
+import { MinimizeIcon, ScreenShareIcon } from "./CallIcons.jsx";
 
 function formatCallDuration(totalSeconds) {
   const m = Math.floor(totalSeconds / 60).toString().padStart(2, "0");
@@ -22,12 +24,35 @@ export default function VoiceCallOverlay({ call }) {
     toggleMute,
     switchMicrophone,
     switchSpeaker,
+    isScreenSharing,
+    localScreenStream,
+    remoteScreenStream,
+    toggleScreenShare,
   } = call;
   const [showAudioSettings, setShowAudioSettings] = useState(false);
+  const [screensMinimized, setScreensMinimized] = useState(false);
+  const hasScreen = !!(localScreenStream || remoteScreenStream);
+
+  useEffect(() => {
+    if (hasScreen) setScreensMinimized(false);
+  }, [hasScreen, localScreenStream, remoteScreenStream]);
+
+  // A barra da chamada é fixa; reserva o espaço dela no app para não cobrir
+  // os atalhos de nova conversa/grupo nem o topo da conversa aberta.
+  useEffect(() => {
+    if (callState !== "connected") return;
+    document.body.classList.add("call-active");
+    document.body.style.setProperty("--active-call-bar-height", "56px");
+    return () => {
+      document.body.classList.remove("call-active");
+      document.body.style.removeProperty("--active-call-bar-height");
+    };
+  }, [callState]);
 
   if (callState === "idle") {
     return statusMessage ? (
       <div
+        className="call-control-bar"
         style={{
           position: "fixed",
           top: 60,
@@ -157,20 +182,18 @@ export default function VoiceCallOverlay({ call }) {
           top: 52,
           left: 0,
           right: 0,
-          zIndex: 60,
-        background: "var(--success)",
-        color: "white",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        padding: "8px 14px",
-        boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
-      }}
+          zIndex: 62,
+        }}
     >
-      <span style={{ fontSize: 13, fontWeight: 500 }}>
-        📞 {peerName} · {formatCallDuration(duration)}
+      <span className="call-control-title">
+        <span className="call-live-dot" /> {peerName} <span>· {formatCallDuration(duration)}</span>
       </span>
-      <div style={{ display: "flex", gap: 8 }}>
+      <div className="call-control-actions">
+        {hasScreen && (
+          <button type="button" className="call-control-button" onClick={() => setScreensMinimized((value) => !value)} title={screensMinimized ? "Mostrar compartilhamento" : "Voltar ao chat"}>
+            {screensMinimized ? <ScreenShareIcon /> : <MinimizeIcon />}
+          </button>
+        )}
         <button
           type="button"
           onClick={() => setShowAudioSettings(true)}
@@ -211,6 +234,14 @@ export default function VoiceCallOverlay({ call }) {
         </button>
         <button
           type="button"
+          onClick={toggleScreenShare}
+          title={isScreenSharing ? "Parar de compartilhar tela" : "Compartilhar tela"}
+          className={isScreenSharing ? "call-control-button active" : "call-control-button"}
+        >
+          <ScreenShareIcon />
+        </button>
+        <button
+          type="button"
           onClick={endCall}
           title="Encerrar chamada"
           style={{
@@ -231,6 +262,14 @@ export default function VoiceCallOverlay({ call }) {
         </button>
       </div>
       </div>
+
+      {hasScreen && !screensMinimized && (
+        <div className="screen-share-dock" aria-label="Telas compartilhadas">
+          <button type="button" className="screen-share-minimize" onClick={() => setScreensMinimized(true)} title="Voltar ao chat" aria-label="Voltar ao chat"><MinimizeIcon /></button>
+          <ScreenShareVideo stream={localScreenStream} label="Você está compartilhando" muted />
+          <ScreenShareVideo stream={remoteScreenStream} label={`${peerName} está compartilhando`} />
+        </div>
+      )}
 
       {showAudioSettings && (
         <CallAudioSettingsModal

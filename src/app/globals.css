@@ -204,10 +204,95 @@ button:disabled {
   flex-shrink: 0;
 }
 
+.call-control-bar {
+  position: fixed;
+  top: 52px;
+  left: 0;
+  right: 0;
+  min-height: 56px;
+  padding: 8px 16px;
+  color: #f6f7fb;
+  background: rgba(20, 24, 34, .96);
+  border-bottom: 1px solid rgba(255, 255, 255, .09);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, .28);
+  backdrop-filter: blur(16px);
+}
+
+.call-control-bar, .call-control-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.call-control-title { min-width: 0; font-size: 14px; font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.call-control-title > span:last-child { color: #aeb7c8; font-weight: 500; }
+.call-live-dot { display: inline-block; width: 8px; height: 8px; margin-right: 5px; border-radius: 50%; background: #3ba55d; box-shadow: 0 0 0 3px rgba(59, 165, 93, .18); }
+.call-control-actions { display: flex; gap: 8px; flex-shrink: 0; }
+.call-control-actions button, .call-control-button { transition: transform .16s ease, background .16s ease; }
+.call-control-button, .screen-share-fullscreen, .screen-share-minimize { display: inline-flex; align-items: center; justify-content: center; }
+.call-icon { width: 18px; height: 18px; display: block; flex: 0 0 auto; }
+.call-control-actions button:hover { transform: translateY(-1px); }
+.call-control-button.active { background: #5865f2 !important; }
+
+.screen-share-dock {
+  position: fixed;
+  z-index: 61;
+  inset: 108px 0 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  grid-auto-rows: minmax(220px, 1fr);
+  gap: 14px;
+  padding: 18px;
+  overflow: auto;
+  background: radial-gradient(circle at 50% 0%, #27314a 0, #11141d 46%, #0c0e14 100%);
+}
+
+.screen-share-preview {
+  position: relative;
+  display: grid;
+  min-height: 220px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, .12);
+  border-radius: 14px;
+  background: #080a0f;
+  box-shadow: 0 12px 35px rgba(0, 0, 0, .34);
+}
+
+.screen-share-preview video { width: 100%; height: 100%; min-height: 0; object-fit: contain; }
+.screen-share-preview:only-child { min-height: calc(100dvh - 144px); }
+.screen-share-label { position: absolute; z-index: 1; left: 12px; bottom: 12px; max-width: calc(100% - 62px); padding: 6px 10px; border-radius: 7px; background: rgba(9, 11, 17, .8); color: #fff; font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; backdrop-filter: blur(8px); }
+.screen-share-fullscreen { position: absolute; z-index: 2; right: 12px; bottom: 12px; width: 38px; height: 38px; padding: 0; border: 0; border-radius: 9px; color: #fff; background: rgba(9, 11, 17, .8); }
+.screen-share-fullscreen:hover { background: #5865f2; }
+.screen-share-preview:fullscreen { width: 100vw; height: 100dvh; border: 0; border-radius: 0; background: #050609; }
+.screen-share-preview:fullscreen video { object-fit: contain; }
+.screen-share-fallback-fullscreen { position: fixed; z-index: 100; inset: 0; display: grid; place-items: center; padding: 16px; background: #050609; }
+.screen-share-fallback-fullscreen > .screen-share-preview { width: min(100%, 1600px); height: min(100%, 900px); }
+.screen-share-fallback-fullscreen > button { position: absolute; z-index: 1; top: 14px; right: 16px; width: 40px; height: 40px; padding: 0; border: 0; border-radius: 50%; color: white; background: rgba(255,255,255,.14); font-size: 30px; }
+.screen-share-minimize { position: fixed; z-index: 63; right: 18px; top: 118px; width: 42px; height: 42px; padding: 0; border: 0; border-radius: 11px; color: #fff; background: rgba(9, 11, 17, .78); box-shadow: 0 4px 14px rgba(0,0,0,.25); }
+.screen-share-minimize:hover { background: #5865f2; }
+
+@media (max-width: 640px) {
+  .call-control-bar { padding: 7px 10px; min-height: 52px; }
+  .call-control-actions { gap: 5px; }
+  .call-control-actions button { width: 34px !important; height: 34px !important; }
+  .call-control-button .call-icon { width: 17px; height: 17px; }
+  .screen-share-dock { inset: 104px 0 0; grid-template-columns: 1fr; grid-auto-rows: minmax(190px, 1fr); padding: 8px; gap: 8px; }
+  .screen-share-preview { min-height: 190px; border-radius: 10px; }
+  .screen-share-preview:only-child { min-height: calc(100dvh - 120px); }
+  .screen-share-minimize { top: 112px; right: 12px; }
+}
+
 .app-layout {
   flex: 1;
   min-height: 0;
   display: flex;
+}
+
+/* A chamada fica fixa acima do app. Esta reserva impede que ela esconda a
+   faixa com “+ Conversa” e “+ Grupo”, tanto no desktop quanto no celular. */
+body.call-active .app-layout {
+  padding-top: var(--active-call-bar-height, 56px);
 }
 
 .sidebar {
@@ -371,7 +456,7 @@ button:disabled {
   position: fixed;
   inset: 0;
   background: var(--overlay);
-  z-index: 20;
+  z-index: 80;
   display: flex;
   justify-content: flex-end;
 }

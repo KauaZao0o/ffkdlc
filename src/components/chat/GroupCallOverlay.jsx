@@ -1,8 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Avatar from "@/components/common/Avatar.jsx";
 import CallAudioSettingsModal from "./CallAudioSettingsModal.jsx";
+import ScreenShareVideo from "./ScreenShareVideo.jsx";
+import { MinimizeIcon, ScreenShareIcon } from "./CallIcons.jsx";
 
 function formatCallDuration(totalSeconds) {
   const m = Math.floor(totalSeconds / 60).toString().padStart(2, "0");
@@ -24,8 +26,29 @@ export default function GroupCallOverlay({ call }) {
     toggleGroupMute,
     switchGroupMicrophone,
     switchGroupSpeaker,
+    groupIsScreenSharing,
+    groupLocalScreenStream,
+    groupRemoteScreens,
+    toggleGroupScreenShare,
   } = call;
   const [showAudioSettings, setShowAudioSettings] = useState(false);
+  const [screensMinimized, setScreensMinimized] = useState(false);
+  const hasScreen = !!(groupLocalScreenStream || Object.keys(groupRemoteScreens).length > 0);
+
+  useEffect(() => {
+    if (hasScreen) setScreensMinimized(false);
+  }, [hasScreen, groupLocalScreenStream, groupRemoteScreens]);
+
+  // Em grupo a faixa de participantes pode ocupar uma segunda linha.
+  useEffect(() => {
+    if (groupCallState !== "active") return;
+    document.body.classList.add("call-active");
+    document.body.style.setProperty("--active-call-bar-height", groupCallPeers.length > 0 ? "104px" : "56px");
+    return () => {
+      document.body.classList.remove("call-active");
+      document.body.style.removeProperty("--active-call-bar-height");
+    };
+  }, [groupCallState, groupCallPeers.length]);
 
   if (groupCallState !== "active") return null;
 
@@ -34,24 +57,26 @@ export default function GroupCallOverlay({ call }) {
   return (
     <>
       <div
+        className="call-control-bar"
         style={{
           position: "fixed",
           top: 52,
           left: 0,
           right: 0,
-          zIndex: 60,
-          background: "var(--success)",
-          color: "white",
-          padding: "8px 14px",
-          boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
+          zIndex: 62,
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-          <span style={{ fontSize: 13, fontWeight: 500, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-            📞 {groupCallConversation?.name} · {formatCallDuration(groupDuration)}
+        <div className="call-control-row">
+          <span className="call-control-title">
+            <span className="call-live-dot" /> {groupCallConversation?.name} <span>· {formatCallDuration(groupDuration)}</span>
             {connectingCount > 0 && ` · conectando ${connectingCount}...`}
           </span>
-          <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+          <div className="call-control-actions">
+            {hasScreen && (
+              <button type="button" className="call-control-button" onClick={() => setScreensMinimized((value) => !value)} title={screensMinimized ? "Mostrar compartilhamentos" : "Voltar ao chat"}>
+                {screensMinimized ? <ScreenShareIcon /> : <MinimizeIcon />}
+              </button>
+            )}
             <button
               type="button"
               onClick={() => setShowAudioSettings(true)}
@@ -89,6 +114,14 @@ export default function GroupCallOverlay({ call }) {
               }}
             >
               {groupIsMuted ? "🔇" : "🎙️"}
+            </button>
+            <button
+              type="button"
+              onClick={toggleGroupScreenShare}
+              title={groupIsScreenSharing ? "Parar de compartilhar tela" : "Compartilhar tela"}
+              className={groupIsScreenSharing ? "call-control-button active" : "call-control-button"}
+            >
+              <ScreenShareIcon />
             </button>
             <button
               type="button"
@@ -135,6 +168,17 @@ export default function GroupCallOverlay({ call }) {
           </div>
         )}
       </div>
+
+      {hasScreen && !screensMinimized && (
+        <div className="screen-share-dock" aria-label="Telas compartilhadas">
+          <button type="button" className="screen-share-minimize" onClick={() => setScreensMinimized(true)} title="Voltar ao chat" aria-label="Voltar ao chat"><MinimizeIcon /></button>
+          <ScreenShareVideo stream={groupLocalScreenStream} label="Você está compartilhando" muted />
+          {Object.entries(groupRemoteScreens).map(([peerId, stream]) => {
+            const peer = groupCallPeers.find((p) => p.id === peerId);
+            return <ScreenShareVideo key={peerId} stream={stream} label={`${peer?.username || "Participante"} está compartilhando`} />;
+          })}
+        </div>
+      )}
 
       {showAudioSettings && (
         <CallAudioSettingsModal
