@@ -15,12 +15,8 @@ export default function GroupCallBanners({ call }) {
   if (entries.length === 0) return null;
 
   // Se já tiver uma chamada em grupo ativa (barra ocupando o topo), empurra
-  // os avisos pra baixo dela - e mais ainda se a grade de vídeo também
-  // estiver visível; senão, fica logo abaixo da barra superior.
-  const hasGroupVideo =
-    groupCallState === "active" &&
-    (call.groupLocalVideoOn || (call.groupCallPeers || []).some((p) => p.videoStream));
-  const topOffset = groupCallState === "active" ? (hasGroupVideo ? 228 : 122) : 52;
+  // os avisos pra baixo dela; senão, fica logo abaixo da barra superior.
+  const topOffset = groupCallState === "active" ? 122 : 52;
 
   return (
     <div

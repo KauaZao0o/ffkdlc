@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import Avatar from "@/components/common/Avatar.jsx";
 import CallAudioSettingsModal from "./CallAudioSettingsModal.jsx";
 
@@ -10,49 +10,9 @@ function formatCallDuration(totalSeconds) {
   return `${m}:${s}`;
 }
 
-// <video> controlado imperativamente: srcObject não é uma prop comum do
-// React (é um MediaStream, não serializa), então atribui direto no
-// elemento sempre que o stream muda.
-function VideoTile({ stream, muted, label, mirrored }) {
-  const videoRef = useRef(null);
-
-  useEffect(() => {
-    if (videoRef.current) videoRef.current.srcObject = stream || null;
-  }, [stream]);
-
-  return (
-    <div style={{ position: "relative", width: "100%", height: "100%", background: "#000", borderRadius: 10, overflow: "hidden" }}>
-      <video
-        ref={videoRef}
-        autoPlay
-        playsInline
-        muted={muted}
-        style={{ width: "100%", height: "100%", objectFit: "cover", transform: mirrored ? "scaleX(-1)" : "none" }}
-      />
-      {label && (
-        <span
-          style={{
-            position: "absolute",
-            bottom: 4,
-            left: 6,
-            fontSize: 10,
-            color: "white",
-            background: "rgba(0,0,0,0.45)",
-            padding: "2px 5px",
-            borderRadius: 5,
-          }}
-        >
-          {label}
-        </span>
-      )}
-    </div>
-  );
-}
-
 // Barra compacta no topo (parecida com a de chamada 1-a-1), mas com uma
 // fileira de avatares - um por pessoa na chamada em grupo, com um aro verde
-// enquanto a conexão com ela ainda não fechou. Se alguém (inclusive você)
-// estiver com câmera ou tela ligada, uma grade de vídeos aparece abaixo.
+// enquanto a conexão com ela ainda não fechou.
 export default function GroupCallOverlay({ call }) {
   const {
     groupCallState,
@@ -64,19 +24,12 @@ export default function GroupCallOverlay({ call }) {
     toggleGroupMute,
     switchGroupMicrophone,
     switchGroupSpeaker,
-    groupLocalVideoOn,
-    groupLocalScreenSharing,
-    groupLocalVideoStream,
-    toggleGroupVideo,
-    toggleGroupScreenShare,
   } = call;
   const [showAudioSettings, setShowAudioSettings] = useState(false);
 
   if (groupCallState !== "active") return null;
 
   const connectingCount = groupCallPeers.filter((p) => !p.connected).length;
-  const peersWithVideo = groupCallPeers.filter((p) => p.videoStream);
-  const showVideoGrid = groupLocalVideoOn || peersWithVideo.length > 0;
 
   return (
     <>
@@ -120,46 +73,6 @@ export default function GroupCallOverlay({ call }) {
             </button>
             <button
               type="button"
-              onClick={toggleGroupVideo}
-              title={groupLocalScreenSharing ? "Câmera (pare o compartilhamento de tela primeiro)" : groupLocalVideoOn ? "Desligar câmera" : "Ligar câmera"}
-              disabled={groupLocalScreenSharing}
-              style={{
-                width: 30,
-                height: 30,
-                borderRadius: "50%",
-                border: "none",
-                background: groupLocalVideoOn ? "rgba(0,0,0,0.35)" : "rgba(255,255,255,0.25)",
-                color: "white",
-                fontSize: 14,
-                opacity: groupLocalScreenSharing ? 0.5 : 1,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              🎥
-            </button>
-            <button
-              type="button"
-              onClick={toggleGroupScreenShare}
-              title={groupLocalScreenSharing ? "Parar compartilhamento de tela" : "Compartilhar tela"}
-              style={{
-                width: 30,
-                height: 30,
-                borderRadius: "50%",
-                border: "none",
-                background: groupLocalScreenSharing ? "rgba(0,0,0,0.35)" : "rgba(255,255,255,0.25)",
-                color: "white",
-                fontSize: 14,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              🖥️
-            </button>
-            <button
-              type="button"
               onClick={toggleGroupMute}
               title={groupIsMuted ? "Ativar microfone" : "Silenciar microfone"}
               style={{
@@ -199,28 +112,6 @@ export default function GroupCallOverlay({ call }) {
             </button>
           </div>
         </div>
-
-        {showVideoGrid && (
-          <div
-            style={{
-              display: "flex",
-              flexWrap: "wrap",
-              gap: 8,
-              marginTop: 10,
-            }}
-          >
-            {groupLocalVideoOn && (
-              <div style={{ width: 130, height: 96 }}>
-                <VideoTile stream={groupLocalVideoStream} muted mirrored={!groupLocalScreenSharing} label="Você" />
-              </div>
-            )}
-            {peersWithVideo.map((p) => (
-              <div key={p.id} style={{ width: 130, height: 96 }}>
-                <VideoTile stream={p.videoStream} label={`${p.username}${p.screenSharing ? " · tela" : ""}`} />
-              </div>
-            ))}
-          </div>
-        )}
 
         {groupCallPeers.length > 0 && (
           <div style={{ display: "flex", gap: 8, marginTop: 8, overflowX: "auto", paddingBottom: 2 }}>
