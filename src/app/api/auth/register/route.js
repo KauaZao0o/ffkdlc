@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import prisma from "@/lib/prisma";
 import { generateToken, setAuthCookie } from "@/lib/auth";
+import { getAppSettings } from "@/lib/settings";
 
 const AVATAR_COLORS = ["blue", "teal", "coral", "pink", "purple", "amber", "green"];
 
@@ -11,6 +12,11 @@ function pickAvatarColor() {
 
 export async function POST(request) {
   try {
+    const settings = await getAppSettings();
+    if (!settings.registrationEnabled) {
+      return NextResponse.json({ error: "O cadastro está desativado no momento." }, { status: 403 });
+    }
+
     const { username, password } = await request.json();
 
     if (!username || !password) {

@@ -20,6 +20,10 @@ function GhostPanel() {
   const [conversations, setConversations] = useState([]);
   const [messageId, setMessageId] = useState("");
   const [status, setStatus] = useState("");
+  const [registrationEnabled, setRegistrationEnabled] = useState(true);
+  const [newUsername, setNewUsername] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [creatingUser, setCreatingUser] = useState(false);
 
   function loadAll() {
     fetch("/api/admin/users", { credentials: "include" })
@@ -28,9 +32,49 @@ function GhostPanel() {
     fetch("/api/admin/conversations", { credentials: "include" })
       .then((res) => (res.ok ? res.json() : []))
       .then(setConversations);
+    fetch("/api/settings")
+      .then((res) => res.json())
+      .then((data) => setRegistrationEnabled(data.registrationEnabled !== false));
   }
 
   useEffect(loadAll, []);
+
+  async function toggleRegistration() {
+    const next = !registrationEnabled;
+    setRegistrationEnabled(next);
+    const res = await fetch("/api/admin/settings", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ registrationEnabled: next }),
+    });
+    if (!res.ok) {
+      setRegistrationEnabled(!next);
+      setStatus("Erro ao atualizar o cadastro público.");
+      return;
+    }
+    setStatus(next ? "Cadastro público ativado." : "Cadastro público desativado.");
+  }
+
+  async function createUser(e) {
+    e.preventDefault();
+    if (!newUsername.trim() || !newPassword) return;
+    setCreatingUser(true);
+    const res = await fetch("/api/admin/users", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ username: newUsername.trim(), password: newPassword }),
+    });
+    const data = await res.json().catch(() => null);
+    setCreatingUser(false);
+    setStatus(res.ok ? `Usuário "${data.username}" criado.` : data?.error || "Erro ao criar usuário.");
+    if (res.ok) {
+      setNewUsername("");
+      setNewPassword("");
+      loadAll();
+    }
+  }
 
   const privateConversations = conversations.filter((c) => !c.isGroup);
   const groupConversations = conversations.filter((c) => c.isGroup);
@@ -119,6 +163,46 @@ function GhostPanel() {
     <div className="ghost-page">
       <h1 style={{ fontSize: 20 }}>Ghost</h1>
       {status && <p style={{ fontSize: 13, color: "var(--text-muted)" }}>{status}</p>}
+
+      <section style={{ marginTop: 24, padding: 12, background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8 }}>
+        <label style={{ display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer" }}>
+          <span>
+            <span style={{ fontSize: 14, fontWeight: 500 }}>Cadastro público</span>
+            <p style={{ margin: "2px 0 0", fontSize: 12, color: "var(--text-faint)" }}>
+              Controla o link "Cadastre-se" no /login e a rota /register.
+            </p>
+          </span>
+          <span className="theme-switch">
+            <input type="checkbox" checked={registrationEnabled} onChange={toggleRegistration} />
+            <span className="theme-switch-track" />
+          </span>
+        </label>
+      </section>
+
+      <section style={{ marginTop: 16 }}>
+        <h2 style={{ fontSize: 16 }}>Registrar usuário</h2>
+        <p style={{ fontSize: 12, color: "var(--text-faint)", marginTop: -4 }}>
+          Funciona mesmo com o cadastro público desativado.
+        </p>
+        <form onSubmit={createUser} className="ghost-message-form">
+          <input
+            value={newUsername}
+            onChange={(e) => setNewUsername(e.target.value)}
+            placeholder="Usuário"
+            style={{ flex: 1, minWidth: 0 }}
+          />
+          <input
+            type="password"
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+            placeholder="Senha"
+            style={{ flex: 1, minWidth: 0 }}
+          />
+          <button type="submit" className="primary" disabled={creatingUser}>
+            {creatingUser ? "..." : "Registrar"}
+          </button>
+        </form>
+      </section>
 
       <section style={{ marginTop: 24 }}>
         <h2 style={{ fontSize: 16 }}>Usuários ({users.length})</h2>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext.jsx";
@@ -9,8 +9,18 @@ export default function RegisterPage() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [registrationEnabled, setRegistrationEnabled] = useState(true);
+  const [checkingSettings, setCheckingSettings] = useState(true);
   const { register } = useAuth();
   const router = useRouter();
+
+  useEffect(() => {
+    fetch("/api/settings")
+      .then((res) => res.json())
+      .then((data) => setRegistrationEnabled(data.registrationEnabled !== false))
+      .catch(() => {})
+      .finally(() => setCheckingSettings(false));
+  }, []);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -21,6 +31,20 @@ export default function RegisterPage() {
     } catch (err) {
       setError(err.message);
     }
+  }
+
+  if (checkingSettings) return null;
+
+  if (!registrationEnabled) {
+    return (
+      <div style={{ maxWidth: 360, margin: "80px auto", padding: 24 }}>
+        <h2>Criar conta</h2>
+        <p style={{ fontSize: 14, color: "var(--text-muted)" }}>O cadastro está desativado no momento.</p>
+        <p style={{ fontSize: 14, marginTop: 16 }}>
+          <Link href="/login">Voltar para o login</Link>
+        </p>
+      </div>
+    );
   }
 
   return (

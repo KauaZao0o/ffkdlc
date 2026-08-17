@@ -95,6 +95,14 @@ model Message {
   @@map("messages")
 }
 
+// Configurações globais do site - sempre uma única linha (id fixo em 1).
+model AppSettings {
+  id                  Int     @id @default(1)
+  registrationEnabled Boolean @default(true) @map("registration_enabled")
+
+  @@map("app_settings")
+}
+
 // Quando alguém escolhe "apagar para mim" numa mensagem específica, cria
 // uma linha aqui - a mensagem continua existindo pra todo mundo, só
 // desaparece da lista de quem apagou.
