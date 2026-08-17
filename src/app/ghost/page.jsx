@@ -287,6 +287,11 @@ function GhostPanel() {
           .ghost-row {
             flex-direction: column;
             align-items: stretch;
+            gap: 6px;
+          }
+
+          .ghost-row-info {
+            flex: 0 1 auto;
           }
 
           .ghost-row-actions {
