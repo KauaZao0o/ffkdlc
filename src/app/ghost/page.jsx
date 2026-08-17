@@ -116,7 +116,7 @@ function GhostPanel() {
   }
 
   return (
-    <div style={{ maxWidth: 900, margin: "0 auto", padding: 24, color: "var(--text)", background: "var(--bg)", minHeight: "100vh" }}>
+    <div className="ghost-page">
       <h1 style={{ fontSize: 20 }}>Ghost</h1>
       {status && <p style={{ fontSize: 13, color: "var(--text-muted)" }}>{status}</p>}
 
@@ -124,23 +124,12 @@ function GhostPanel() {
         <h2 style={{ fontSize: 16 }}>Usuários ({users.length})</h2>
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           {users.map((u) => (
-            <div
-              key={u.id}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                padding: "8px 12px",
-                background: "var(--surface)",
-                border: "1px solid var(--border)",
-                borderRadius: 8,
-                gap: 8,
-              }}
-            >
-              <span style={{ fontSize: 14 }}>
-                {u.username} <span style={{ color: "var(--text-faint)", fontSize: 12 }}>{u.id}</span>
+            <div key={u.id} className="ghost-row">
+              <span className="ghost-row-info">
+                {u.username}
+                <span className="ghost-row-id">{u.id}</span>
               </span>
-              <span style={{ display: "flex", gap: 12, flexShrink: 0 }}>
+              <span className="ghost-row-actions">
                 <button onClick={() => renameUser(u.id, u.username)}>Renomear</button>
                 <button onClick={() => changePassword(u.id, u.username)}>Trocar senha</button>
                 <button onClick={() => deleteUser(u.id, u.username)} style={{ color: "var(--danger)" }}>
@@ -156,21 +145,18 @@ function GhostPanel() {
         <h2 style={{ fontSize: 16 }}>Conversas ({privateConversations.length})</h2>
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {privateConversations.map((c) => (
-            <div
-              key={c.id}
-              style={{ padding: "10px 12px", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8 }}
-            >
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <span style={{ fontSize: 14 }}>
-                  {c.members.map((m) => m.username).join(" · ") || "(sem participantes)"}{" "}
-                  <span style={{ color: "var(--text-faint)", fontSize: 12 }}>
-                    {c.id} · {c.messageCount} msgs
-                  </span>
+            <div key={c.id} className="ghost-row">
+              <span className="ghost-row-info">
+                {c.members.map((m) => m.username).join(" · ") || "(sem participantes)"}
+                <span className="ghost-row-id">
+                  {c.id} · {c.messageCount} msgs
                 </span>
+              </span>
+              <span className="ghost-row-actions">
                 <button onClick={() => deleteConversation(c.id)} style={{ color: "var(--danger)" }}>
                   Apagar conversa
                 </button>
-              </div>
+              </span>
             </div>
           ))}
         </div>
@@ -184,14 +170,14 @@ function GhostPanel() {
               key={c.id}
               style={{ padding: "10px 12px", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8 }}
             >
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <span style={{ fontSize: 14 }}>
-                  {c.name || "(sem nome)"}{" "}
-                  <span style={{ color: "var(--text-faint)", fontSize: 12 }}>
+              <div className="ghost-row" style={{ padding: 0, border: "none", background: "transparent" }}>
+                <span className="ghost-row-info">
+                  {c.name || "(sem nome)"}
+                  <span className="ghost-row-id">
                     {c.id} · {c.messageCount} msgs
                   </span>
                 </span>
-                <span style={{ display: "flex", gap: 12, flexShrink: 0 }}>
+                <span className="ghost-row-actions">
                   <button onClick={() => renameGroup(c.id, c.name)}>Renomear grupo</button>
                   <button onClick={() => deleteConversation(c.id)} style={{ color: "var(--danger)" }}>
                     Apagar conversa
@@ -234,16 +220,88 @@ function GhostPanel() {
           O conteúdo das mensagens não é listado aqui. Informe conversationId/messageId (visível no seu próprio
           histórico de rede/DB) pra apagar uma mensagem específica.
         </p>
-        <form onSubmit={deleteMessageById} style={{ display: "flex", gap: 8 }}>
+        <form onSubmit={deleteMessageById} className="ghost-message-form">
           <input
             value={messageId}
             onChange={(e) => setMessageId(e.target.value)}
             placeholder="conversationId/messageId"
-            style={{ flex: 1, padding: 8, borderRadius: 6, border: "1px solid var(--input-border)", background: "var(--surface)", color: "var(--text)" }}
+            style={{ flex: 1, minWidth: 0, padding: 8, borderRadius: 6, border: "1px solid var(--input-border)", background: "var(--surface)", color: "var(--text)" }}
           />
           <button type="submit">Apagar</button>
         </form>
       </section>
+
+      <style jsx>{`
+        .ghost-page {
+          max-width: 900px;
+          margin: 0 auto;
+          padding: 24px;
+          color: var(--text);
+          background: var(--bg);
+          min-height: 100vh;
+          box-sizing: border-box;
+        }
+
+        .ghost-row {
+          display: flex;
+          flex-wrap: wrap;
+          align-items: center;
+          justify-content: space-between;
+          gap: 10px;
+          padding: 8px 12px;
+          background: var(--surface);
+          border: 1px solid var(--border);
+          border-radius: 8px;
+        }
+
+        .ghost-row-info {
+          font-size: 14px;
+          min-width: 0;
+          flex: 1 1 220px;
+        }
+
+        .ghost-row-id {
+          display: block;
+          color: var(--text-faint);
+          font-size: 11px;
+          word-break: break-all;
+        }
+
+        .ghost-row-actions {
+          display: flex;
+          gap: 10px;
+          flex-wrap: wrap;
+          flex-shrink: 0;
+        }
+
+        .ghost-message-form {
+          display: flex;
+          gap: 8px;
+        }
+
+        @media (max-width: 560px) {
+          .ghost-page {
+            padding: 16px;
+          }
+
+          .ghost-row {
+            flex-direction: column;
+            align-items: stretch;
+          }
+
+          .ghost-row-actions {
+            width: 100%;
+          }
+
+          .ghost-row-actions button {
+            flex: 1 1 auto;
+          }
+
+          .ghost-message-form {
+            flex-direction: column;
+          }
+        }
+      `}</style>
     </div>
   );
 }
