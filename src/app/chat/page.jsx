@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext.jsx";
 import { useSound } from "@/context/SoundContext.jsx";
 import { CallProvider, useCall } from "@/context/CallContext.jsx";
+import { MusicPlayerProvider, useMusicPlayer } from "@/context/MusicPlayerContext.jsx";
 import { getSupabaseBrowserClient } from "@/lib/supabaseClient";
 import ConversationList from "@/components/sidebar/ConversationList.jsx";
 import ChatWindow from "@/components/chat/ChatWindow.jsx";
@@ -15,6 +16,7 @@ import ParticipantsList from "@/components/group/ParticipantsList.jsx";
 import CreateGroupModal from "@/components/group/CreateGroupModal.jsx";
 import NewConversationModal from "@/components/sidebar/NewConversationModal.jsx";
 import SettingsModal from "@/components/settings/SettingsModal.jsx";
+import MusicPlayerDrawer from "@/components/player/MusicPlayerDrawer.jsx";
 import Avatar from "@/components/common/Avatar.jsx";
 
 // Fica dentro do CallProvider pra poder usar useCall() e mostrar a chamada
@@ -27,6 +29,18 @@ function GlobalCallOverlay() {
       <VoiceCallOverlay call={call} />
       <GroupCallOverlay call={call} />
       <GroupCallBanners call={call} />
+    </>
+  );
+}
+
+function MusicPlayerButton() {
+  const { drawerOpen, openDrawer, closeDrawer } = useMusicPlayer();
+  return (
+    <>
+      <button className="icon-button" onClick={openDrawer} title="Player de música">
+        🎵
+      </button>
+      {drawerOpen && <MusicPlayerDrawer onClose={closeDrawer} />}
     </>
   );
 }
@@ -157,6 +171,7 @@ export default function ChatPage() {
   if (loading || !user) return null;
 
   return (
+    <MusicPlayerProvider>
     <CallProvider user={user} conversations={conversations}>
       <div className="app-shell">
         <div className="top-bar">
@@ -167,6 +182,7 @@ export default function ChatPage() {
                 👻
               </button>
             )}
+            <MusicPlayerButton />
             <button
               className="icon-button"
               onClick={() => setShowSettings(true)}
@@ -249,5 +265,6 @@ export default function ChatPage() {
         <GlobalCallOverlay />
       </div>
     </CallProvider>
+    </MusicPlayerProvider>
   );
 }
