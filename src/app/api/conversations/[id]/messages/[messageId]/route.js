@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { getUserIdFromRequest } from "@/lib/auth";
+import { getUserIdFromRequest, isGhostUser } from "@/lib/auth";
 
 // Apaga uma mensagem PARA TODO MUNDO. Só quem escreveu a mensagem pode
 // fazer isso - ou o administrador do grupo, apagando mensagem de outra
-// pessoa (equivalente ao poder de moderação do WhatsApp/Discord).
+// pessoa (equivalente ao poder de moderação do WhatsApp/Discord). A conta
+// Ghost pode apagar qualquer mensagem.
 export async function DELETE(request, { params }) {
   const userId = getUserIdFromRequest(request);
   if (!userId) return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
@@ -17,7 +18,7 @@ export async function DELETE(request, { params }) {
 
   const isSender = message.senderId === userId;
 
-  if (!isSender) {
+  if (!isSender && !(await isGhostUser(userId))) {
     const membership = await prisma.conversationMember.findUnique({
       where: { userId_conversationId: { userId, conversationId: params.id } },
     });

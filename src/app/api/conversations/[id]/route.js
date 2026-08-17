@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { getUserIdFromRequest } from "@/lib/auth";
+import { getUserIdFromRequest, isGhostUser } from "@/lib/auth";
 
 // Edita o nome e/ou a foto do grupo. Qualquer participante do grupo pode
 // fazer essa alteração (igual ao padrão do WhatsApp) - não é restrito a
-// administradores.
+// administradores. A conta Ghost pode editar qualquer grupo sem participar.
 export async function PATCH(request, { params }) {
   const userId = getUserIdFromRequest(request);
   if (!userId) return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
@@ -17,11 +17,13 @@ export async function PATCH(request, { params }) {
     return NextResponse.json({ error: "Só é possível editar grupos." }, { status: 400 });
   }
 
-  const membership = await prisma.conversationMember.findUnique({
-    where: { userId_conversationId: { userId, conversationId: params.id } },
-  });
-  if (!membership) {
-    return NextResponse.json({ error: "Você não participa desse grupo." }, { status: 403 });
+  if (!(await isGhostUser(userId))) {
+    const membership = await prisma.conversationMember.findUnique({
+      where: { userId_conversationId: { userId, conversationId: params.id } },
+    });
+    if (!membership) {
+      return NextResponse.json({ error: "Você não participa desse grupo." }, { status: 403 });
+    }
   }
 
   const { name, avatarUrl } = await request.json();
@@ -48,6 +50,7 @@ export async function PATCH(request, { params }) {
 
 // Apaga um grupo (e, em cascata, todas as mensagens e participações dele,
 // graças ao onDelete: Cascade no schema). Só administradores podem apagar.
+// Exceção: a conta Ghost pode apagar qualquer conversa, incluindo privadas.
 export async function DELETE(request, { params }) {
   const userId = getUserIdFromRequest(request);
   if (!userId) return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
@@ -57,16 +60,20 @@ export async function DELETE(request, { params }) {
     return NextResponse.json({ error: "Conversa não encontrada." }, { status: 404 });
   }
 
-  if (!conversation.isGroup) {
-    return NextResponse.json({ error: "Conversas privadas não podem ser excluídas por aqui." }, { status: 400 });
-  }
+  const isGhost = await isGhostUser(userId);
 
-  const membership = await prisma.conversationMember.findUnique({
-    where: { userId_conversationId: { userId, conversationId: params.id } },
-  });
+  if (!isGhost) {
+    if (!conversation.isGroup) {
+      return NextResponse.json({ error: "Conversas privadas não podem ser excluídas por aqui." }, { status: 400 });
+    }
 
-  if (!membership?.isAdmin) {
-    return NextResponse.json({ error: "Só administradores do grupo podem excluí-lo." }, { status: 403 });
+    const membership = await prisma.conversationMember.findUnique({
+      where: { userId_conversationId: { userId, conversationId: params.id } },
+    });
+
+    if (!membership?.isAdmin) {
+      return NextResponse.json({ error: "Só administradores do grupo podem excluí-lo." }, { status: 403 });
+    }
   }
 
   try {

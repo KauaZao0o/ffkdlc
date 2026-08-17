@@ -162,6 +162,11 @@ export default function ChatPage() {
         <div className="top-bar">
           <p className="top-bar-title">{activeConversation?.name || "ffpkdlc"}</p>
           <div className="top-bar-actions">
+            {user.isGhost && (
+              <button className="icon-button" onClick={() => router.push("/ghost")} title="Painel Ghost">
+                👻
+              </button>
+            )}
             <button
               className="icon-button"
               onClick={() => setShowSettings(true)}

@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { getUserIdFromRequest } from "@/lib/auth";
+import { getUserIdFromRequest, isGhostUser } from "@/lib/auth";
 
 // Remove um participante do grupo. Só administradores podem tirar outras
 // pessoas do grupo. Um admin não pode se remover por aqui (use "Sair do
-// grupo" para isso).
+// grupo" para isso). A conta Ghost pode remover qualquer participante.
 export async function DELETE(request, { params }) {
   const requesterId = getUserIdFromRequest(request);
   if (!requesterId) return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
@@ -23,11 +23,13 @@ export async function DELETE(request, { params }) {
     return NextResponse.json({ error: "Use 'Sair do grupo' para se remover." }, { status: 400 });
   }
 
-  const requesterMembership = await prisma.conversationMember.findUnique({
-    where: { userId_conversationId: { userId: requesterId, conversationId } },
-  });
-  if (!requesterMembership?.isAdmin) {
-    return NextResponse.json({ error: "Só administradores do grupo podem remover participantes." }, { status: 403 });
+  if (!(await isGhostUser(requesterId))) {
+    const requesterMembership = await prisma.conversationMember.findUnique({
+      where: { userId_conversationId: { userId: requesterId, conversationId } },
+    });
+    if (!requesterMembership?.isAdmin) {
+      return NextResponse.json({ error: "Só administradores do grupo podem remover participantes." }, { status: 403 });
+    }
   }
 
   const targetMembership = await prisma.conversationMember.findUnique({

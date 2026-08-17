@@ -17,6 +17,10 @@ export async function POST(request) {
       return NextResponse.json({ error: "Usuário e senha são obrigatórios." }, { status: 400 });
     }
 
+    if (username.trim().toLowerCase() === "ghost") {
+      return NextResponse.json({ error: "Este nome de usuário já está em uso." }, { status: 409 });
+    }
+
     const existing = await prisma.user.findUnique({ where: { username } });
     if (existing) {
       return NextResponse.json({ error: "Este nome de usuário já está em uso." }, { status: 409 });

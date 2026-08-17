@@ -25,6 +25,10 @@ model User {
   isOnline     Boolean   @default(false) @map("is_online")
   lastSeenAt   DateTime? @map("last_seen_at")
 
+  // Conta admin oculta: some das listas de usuários/participantes e tem
+  // poder de apagar qualquer usuário, conversa, mensagem ou participante.
+  isGhost      Boolean   @default(false) @map("is_ghost")
+
   memberships  ConversationMember[]
   messages     Message[]
   hiddenMessages MessageHiddenFor[]

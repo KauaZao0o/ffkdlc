@@ -18,6 +18,7 @@ export async function GET(request) {
     username: user.username,
     avatarColor: user.avatarColor,
     avatarUrl: user.avatarUrl,
+    isGhost: user.isGhost,
   });
 }
 

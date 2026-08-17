@@ -1,4 +1,6 @@
 import jwt from "jsonwebtoken";
+import { NextResponse } from "next/server";
+import prisma from "./prisma";
 
 const COOKIE_NAME = "token";
 
@@ -36,4 +38,24 @@ export function setAuthCookie(response, token) {
 
 export function clearAuthCookie(response) {
   response.cookies.set(COOKIE_NAME, "", { path: "/", maxAge: 0 });
+}
+
+export async function isGhostUser(userId) {
+  if (!userId) return false;
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { isGhost: true } });
+  return !!user?.isGhost;
+}
+
+// Usado pelas rotas /api/admin/*: exige que o usuário logado seja a conta
+// Ghost. Retorna { userId } se autorizado, ou { response } com o erro pronto
+// pra devolver (404 em vez de 403 pra não denunciar que a rota existe).
+export async function requireGhost(request) {
+  const userId = getUserIdFromRequest(request);
+  if (!userId) {
+    return { response: NextResponse.json({ error: "Não autenticado." }, { status: 401 }) };
+  }
+  if (!(await isGhostUser(userId))) {
+    return { response: NextResponse.json({ error: "Não encontrado." }, { status: 404 }) };
+  }
+  return { userId };
 }
