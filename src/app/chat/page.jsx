@@ -160,7 +160,7 @@ export default function ChatPage() {
     <CallProvider user={user} conversations={conversations}>
       <div className="app-shell">
         <div className="top-bar">
-          <p className="top-bar-title">{activeConversation?.name || "Chat"}</p>
+          <p className="top-bar-title">{activeConversation?.name || "ffpkdlc"}</p>
           <div className="top-bar-actions">
             <button
               className="icon-button"

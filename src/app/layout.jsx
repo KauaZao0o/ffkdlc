@@ -19,8 +19,12 @@ const THEME_INIT_SCRIPT = `
 `;
 
 export const metadata = {
-  title: "Chat App",
-  description: "Chat em tempo real com Next.js e Supabase",
+  title: "ffpkdlc",
+  description: "ffpkdlc — conversas e chamadas em tempo real",
+  icons: {
+    icon: "/ffpkdlc-icon.png",
+    apple: "/ffpkdlc-icon.png",
+  },
 };
 
 // Sem isso, o navegador do celular renderiza a página numa "tela virtual"

@@ -19,6 +19,23 @@ const AUDIO_MAX_BITRATE = 64000;
 // Tempo máximo esperando a outra pessoa atender antes de desistir sozinho.
 const RING_TIMEOUT_MS = 45000;
 
+function getScreenShareUnavailableMessage() {
+  if (!window.isSecureContext) {
+    return "O compartilhamento de tela no celular exige que o ffpkdlc seja aberto em HTTPS. Acesse pelo endereço https:// do site; um IP em http:// não libera essa permissão.";
+  }
+
+  const isAppleMobile = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+  if (isAppleMobile) {
+    return "O navegador do iPhone/iPad não disponibiliza compartilhamento de tela para sites. Você pode assistir às telas normalmente; para iniciar uma, use o ffpkdlc no computador ou um app nativo.";
+  }
+
+  return "Este navegador não disponibiliza captura de tela. Abra o ffpkdlc diretamente no Chrome ou Edge atualizado, em uma página HTTPS (não dentro de outro app).";
+}
+
+function supportsScreenShare() {
+  return typeof window !== "undefined" && window.isSecureContext && !!navigator.mediaDevices?.getDisplayMedia;
+}
+
 function randomId() {
   return Math.random().toString(36).slice(2) + Date.now().toString(36);
 }
@@ -610,8 +627,8 @@ export function CallProvider({ user, conversations, children }) {
 
   const toggleScreenShare = useCallback(async () => {
     if (screenStreamRef.current) return stopScreenShare();
-    if (!navigator.mediaDevices?.getDisplayMedia) {
-      alert("Este navegador não permite compartilhar a tela. No celular, use um navegador atualizado que ofereça essa opção.");
+    if (!supportsScreenShare()) {
+      alert(getScreenShareUnavailableMessage());
       return;
     }
     try {
@@ -734,8 +751,8 @@ export function CallProvider({ user, conversations, children }) {
 
   const toggleGroupScreenShare = useCallback(async () => {
     if (groupScreenStreamRef.current) return stopGroupScreenShare();
-    if (!navigator.mediaDevices?.getDisplayMedia) {
-      alert("Este navegador não permite compartilhar a tela. No celular, use um navegador atualizado que ofereça essa opção.");
+    if (!supportsScreenShare()) {
+      alert(getScreenShareUnavailableMessage());
       return;
     }
     try {
