@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUserIdFromRequest } from "@/lib/auth";
 
+const GHOST_TARGET_ERROR = "Esse usuário não pode ser adicionado a uma conversa.";
+
 // Lista todas as conversas (privadas + grupos) do usuário logado,
 // já com a última mensagem para exibir na sidebar.
 export async function GET(request) {
@@ -59,6 +61,11 @@ export async function POST(request) {
   const { otherUserId } = await request.json();
   if (!otherUserId) {
     return NextResponse.json({ error: "Informe o usuário com quem deseja conversar." }, { status: 400 });
+  }
+
+  const target = await prisma.user.findUnique({ where: { id: otherUserId }, select: { isGhost: true } });
+  if (!target || target.isGhost) {
+    return NextResponse.json({ error: GHOST_TARGET_ERROR }, { status: 400 });
   }
 
   const existing = await prisma.conversation.findFirst({

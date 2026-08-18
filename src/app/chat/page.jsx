@@ -6,6 +6,8 @@ import { useAuth } from "@/context/AuthContext.jsx";
 import { useSound } from "@/context/SoundContext.jsx";
 import { CallProvider, useCall } from "@/context/CallContext.jsx";
 import { MusicPlayerProvider, useMusicPlayer } from "@/context/MusicPlayerContext.jsx";
+import { PresenceProvider } from "@/context/PresenceContext.jsx";
+import { ProfileViewProvider } from "@/context/ProfileViewContext.jsx";
 import { getSupabaseBrowserClient } from "@/lib/supabaseClient";
 import ConversationList from "@/components/sidebar/ConversationList.jsx";
 import ChatWindow from "@/components/chat/ChatWindow.jsx";
@@ -17,6 +19,7 @@ import CreateGroupModal from "@/components/group/CreateGroupModal.jsx";
 import NewConversationModal from "@/components/sidebar/NewConversationModal.jsx";
 import SettingsModal from "@/components/settings/SettingsModal.jsx";
 import MusicPlayerDrawer from "@/components/player/MusicPlayerDrawer.jsx";
+import SearchDrawer from "@/components/search/SearchDrawer.jsx";
 import Avatar from "@/components/common/Avatar.jsx";
 
 // Fica dentro do CallProvider pra poder usar useCall() e mostrar a chamada
@@ -41,6 +44,18 @@ function MusicPlayerButton() {
         🎵
       </button>
       {drawerOpen && <MusicPlayerDrawer onClose={closeDrawer} />}
+    </>
+  );
+}
+
+function SearchButton() {
+  const [showSearch, setShowSearch] = useState(false);
+  return (
+    <>
+      <button className="icon-button" onClick={() => setShowSearch(true)} title="Pesquisar usuários">
+        🔍
+      </button>
+      {showSearch && <SearchDrawer onClose={() => setShowSearch(false)} />}
     </>
   );
 }
@@ -172,6 +187,8 @@ export default function ChatPage() {
 
   return (
     <MusicPlayerProvider>
+    <PresenceProvider user={user}>
+    <ProfileViewProvider>
     <CallProvider user={user} conversations={conversations}>
       <div className="app-shell">
         <div className="top-bar">
@@ -182,6 +199,7 @@ export default function ChatPage() {
                 👻
               </button>
             )}
+            <SearchButton />
             <MusicPlayerButton />
             <button
               className="icon-button"
@@ -265,6 +283,8 @@ export default function ChatPage() {
         <GlobalCallOverlay />
       </div>
     </CallProvider>
+    </ProfileViewProvider>
+    </PresenceProvider>
     </MusicPlayerProvider>
   );
 }

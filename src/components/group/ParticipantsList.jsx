@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext.jsx";
+import { useProfileView } from "@/context/ProfileViewContext.jsx";
 import AddParticipantsModal from "./AddParticipantsModal.jsx";
 import Avatar from "@/components/common/Avatar.jsx";
 import { uploadChatFile } from "@/lib/uploadImage";
@@ -17,6 +18,7 @@ export default function ParticipantsList({ conversation, onGroupDeleted, onLeftG
   const [savingName, setSavingName] = useState(false);
   const [uploadingGroupAvatar, setUploadingGroupAvatar] = useState(false);
   const [removingId, setRemovingId] = useState(null);
+  const { openProfile } = useProfileView();
 
   function loadParticipants() {
     if (!conversation?.isGroup) {
@@ -275,11 +277,27 @@ export default function ParticipantsList({ conversation, onGroupDeleted, onLeftG
       <div style={{ flex: 1 }}>
         {participants.map((p) => (
           <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-            <Avatar username={p.username} avatarColor={p.avatarColor} avatarUrl={p.avatarUrl} size={28} />
-            <p style={{ margin: 0, fontSize: 13, flex: 1 }}>
-              {p.username}
-              {p.isAdmin ? " (admin)" : ""}
-            </p>
+            <button
+              onClick={() => openProfile(p.username)}
+              title={`Ver perfil de ${p.username}`}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                flex: 1,
+                minWidth: 0,
+                border: "none",
+                background: "transparent",
+                padding: 0,
+                textAlign: "left",
+              }}
+            >
+              <Avatar username={p.username} avatarColor={p.avatarColor} avatarUrl={p.avatarUrl} size={28} />
+              <span style={{ margin: 0, fontSize: 13, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {p.username}
+                {p.isAdmin ? " (admin)" : ""}
+              </span>
+            </button>
             {isAdmin && p.id !== user?.id && (
               <button
                 onClick={() => handleRemoveParticipant(p)}

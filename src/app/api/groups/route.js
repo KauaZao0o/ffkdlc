@@ -13,6 +13,14 @@ export async function POST(request) {
 
   const uniqueMemberIds = Array.from(new Set([...memberIds, userId]));
 
+  // Checa só quem foi convidado, não o próprio criador do grupo - assim o
+  // Ghost consegue criar grupos normalmente (ele obviamente vira membro do
+  // grupo que ele mesmo cria), mas ninguém consegue *adicionar* o Ghost.
+  const ghostCount = await prisma.user.count({ where: { id: { in: memberIds }, isGhost: true } });
+  if (ghostCount > 0) {
+    return NextResponse.json({ error: "Esse usuário não pode ser adicionado a um grupo." }, { status: 400 });
+  }
+
   try {
     const group = await prisma.conversation.create({
       data: {

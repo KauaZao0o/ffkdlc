@@ -177,6 +177,7 @@ export default function VoiceCallOverlay({ call }) {
   return (
     <>
       <div
+        className="call-control-bar"
         style={{
           position: "fixed",
           top: 52,
@@ -184,7 +185,8 @@ export default function VoiceCallOverlay({ call }) {
           right: 0,
           zIndex: 62,
         }}
-    >
+      >
+      <div className="call-control-row">
       <span className="call-control-title">
         <span className="call-live-dot" /> {peerName} <span>· {formatCallDuration(duration)}</span>
       </span>
@@ -260,6 +262,7 @@ export default function VoiceCallOverlay({ call }) {
         >
           📞
         </button>
+      </div>
       </div>
       </div>
 

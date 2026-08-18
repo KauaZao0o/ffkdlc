@@ -41,7 +41,6 @@ export default function MessageInput({ channelRef, userId, conversationId, parti
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [mention, setMention] = useState(null); // { start, query }
   const [mentionIndex, setMentionIndex] = useState(0);
-  const [isTouchDevice, setIsTouchDevice] = useState(false);
 
   const typingTimeout = useRef(null);
   const mediaRecorderRef = useRef(null);
@@ -52,12 +51,6 @@ export default function MessageInput({ channelRef, userId, conversationId, parti
   const fileInputRef = useRef(null);
   const cameraInputRef = useRef(null);
   const textareaRef = useRef(null);
-
-  useEffect(() => {
-    setIsTouchDevice(
-      typeof window !== "undefined" && ("ontouchstart" in window || navigator.maxTouchPoints > 0)
-    );
-  }, []);
 
   // Se o usuário sair da conversa/fechar a página no meio de uma gravação,
   // garante que o microfone é liberado.
@@ -161,11 +154,10 @@ export default function MessageInput({ channelRef, userId, conversationId, parti
     }
 
     if (e.key === "Enter") {
-      // Celular: Enter sempre quebra linha (o teclado touch já tem seu
-      // próprio botão de "enviar"/"próximo" separado do de enviar mensagem).
-      if (isTouchDevice) return;
-
-      // PC: Shift+Enter quebra linha, Enter sozinho envia.
+      // Shift+Enter quebra linha, Enter sozinho envia - sem depender de
+      // detecção de "é celular ou não" (notebooks com tela touch reportavam
+      // suporte a toque e quebravam esse comportamento mesmo com teclado
+      // físico conectado).
       if (e.shiftKey) return;
       e.preventDefault();
       handleSubmit(e);

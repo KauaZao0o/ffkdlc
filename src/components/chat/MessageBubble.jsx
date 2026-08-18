@@ -3,17 +3,31 @@
 import { useEffect, useRef, useState } from "react";
 import Avatar from "@/components/common/Avatar.jsx";
 import AudioMessage from "./AudioMessage.jsx";
+import { useProfileView } from "@/context/ProfileViewContext.jsx";
 
 const MENTION_SPLIT_REGEX = /(@[a-zA-Z0-9_]+)/g;
 const MENTION_TEST_REGEX = /^@[a-zA-Z0-9_]+$/;
 
-function renderContentWithMentions(content) {
+// Clicar numa menção "@fulano" dentro do texto abre o perfil dela.
+function renderContentWithMentions(content, onMentionClick) {
   const parts = content.split(MENTION_SPLIT_REGEX);
   return parts.map((part, i) =>
     MENTION_TEST_REGEX.test(part) ? (
-      <span key={i} style={{ fontWeight: 700, color: "var(--primary-bg)" }}>
+      <button
+        key={i}
+        onClick={() => onMentionClick(part.slice(1))}
+        style={{
+          fontWeight: 700,
+          color: "var(--primary-bg)",
+          border: "none",
+          background: "transparent",
+          padding: 0,
+          font: "inherit",
+          cursor: "pointer",
+        }}
+      >
         {part}
-      </span>
+      </button>
     ) : (
       part
     )
@@ -105,6 +119,7 @@ export default function MessageBubble({ message, isOwn, canDeleteForEveryone, on
   const [menuPos, setMenuPos] = useState(null);
   const menuButtonRef = useRef(null);
   const menuRef = useRef(null);
+  const { openProfile } = useProfileView();
   const isImage = message.type === "image" && message.fileUrl;
   const isAudio = message.type === "audio" && message.fileUrl;
   const isFile = message.type === "file" && message.fileUrl;
@@ -191,17 +206,36 @@ export default function MessageBubble({ message, isOwn, canDeleteForEveryone, on
       }}
     >
       {!isOwn && (
-        <span style={{ fontSize: 11, color: "var(--text-faint)", marginBottom: 2, marginLeft: 40 }}>
+        <button
+          onClick={() => openProfile(message.sender?.username)}
+          style={{
+            alignSelf: "flex-start",
+            fontSize: 11,
+            color: "var(--text-faint)",
+            marginBottom: 2,
+            marginLeft: 40,
+            border: "none",
+            background: "transparent",
+            padding: 0,
+            cursor: "pointer",
+          }}
+        >
           {message.sender?.username}
-        </span>
+        </button>
       )}
       <div style={{ display: "flex", alignItems: "flex-end", gap: 6, flexDirection: isOwn ? "row-reverse" : "row", minWidth: 0 }}>
-        <Avatar
-          username={message.sender?.username}
-          avatarColor={message.sender?.avatarColor}
-          avatarUrl={message.sender?.avatarUrl}
-          size={28}
-        />
+        <button
+          onClick={() => openProfile(message.sender?.username)}
+          title={`Ver perfil de ${message.sender?.username}`}
+          style={{ border: "none", background: "transparent", padding: 0, cursor: "pointer", flexShrink: 0 }}
+        >
+          <Avatar
+            username={message.sender?.username}
+            avatarColor={message.sender?.avatarColor}
+            avatarUrl={message.sender?.avatarUrl}
+            size={28}
+          />
+        </button>
         <div style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 4, flexDirection: isOwn ? "row-reverse" : "row", minWidth: 0 }}>
             <div
@@ -262,7 +296,7 @@ export default function MessageBubble({ message, isOwn, canDeleteForEveryone, on
               ) : isFile ? (
                 <FileMessage url={message.fileUrl} isOwn={isOwn} />
               ) : (
-                renderContentWithMentions(message.content)
+                renderContentWithMentions(message.content, openProfile)
               )}
             </div>
 

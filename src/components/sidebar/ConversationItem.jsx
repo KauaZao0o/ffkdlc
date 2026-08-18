@@ -1,7 +1,11 @@
+"use client";
+
+import { useProfileView } from "@/context/ProfileViewContext.jsx";
 import Avatar from "@/components/common/Avatar.jsx";
 
 export default function ConversationItem({ conversation, isActive, onClick }) {
   const otherUser = !conversation.isGroup ? conversation.participants?.[0] : null;
+  const { openProfile } = useProfileView();
 
   return (
     <div
@@ -41,7 +45,16 @@ export default function ConversationItem({ conversation, isActive, onClick }) {
           </div>
         )
       ) : (
-        <Avatar username={conversation.name} avatarColor={otherUser?.avatarColor} avatarUrl={otherUser?.avatarUrl} />
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            openProfile(otherUser?.username);
+          }}
+          title={`Ver perfil de ${otherUser?.username}`}
+          style={{ border: "none", background: "transparent", padding: 0, cursor: "pointer", flexShrink: 0 }}
+        >
+          <Avatar username={conversation.name} avatarColor={otherUser?.avatarColor} avatarUrl={otherUser?.avatarUrl} />
+        </button>
       )}
       <div style={{ flex: 1, minWidth: 0 }}>
         <p

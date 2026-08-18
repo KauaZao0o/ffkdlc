@@ -7,6 +7,8 @@ import MessageBubble from "./MessageBubble.jsx";
 import MessageInput from "./MessageInput.jsx";
 import CallAudioSettingsModal from "./CallAudioSettingsModal.jsx";
 import { useCall } from "@/context/CallContext.jsx";
+import { useProfileView } from "@/context/ProfileViewContext.jsx";
+import Avatar from "@/components/common/Avatar.jsx";
 
 const NEAR_BOTTOM_THRESHOLD = 100;
 
@@ -20,6 +22,7 @@ export default function ChatWindow({ conversation, onHideConversation, onBack, o
   const [showAudioSettings, setShowAudioSettings] = useState(false);
   const { user } = useAuth();
   const call = useCall();
+  const { openProfile } = useProfileView();
   const bottomRef = useRef(null);
   const scrollContainerRef = useRef(null);
   const channelRef = useRef(null);
@@ -265,6 +268,15 @@ export default function ChatWindow({ conversation, onHideConversation, onBack, o
           <button className="icon-button mobile-only" onClick={onBack} title="Voltar para as conversas">
             ←
           </button>
+          {!conversation.isGroup && (
+            <button
+              onClick={() => openProfile(conversation.name)}
+              title={`Ver perfil de ${conversation.name}`}
+              style={{ border: "none", background: "transparent", padding: 0, cursor: "pointer", flexShrink: 0 }}
+            >
+              <Avatar username={conversation.name} avatarColor={conversation.avatarColor} avatarUrl={conversation.avatarUrl} size={32} />
+            </button>
+          )}
           <p
             style={{
               margin: 0,

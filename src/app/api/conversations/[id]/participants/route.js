@@ -47,6 +47,16 @@ export async function POST(request, { params }) {
   const existingIds = new Set(existing.map((m) => m.userId));
   const newIds = memberIds.filter((id) => !existingIds.has(id));
 
+  const ghostCount = await prisma.user.count({ where: { id: { in: newIds }, isGhost: true } });
+  if (ghostCount > 0) {
+    return NextResponse.json({ error: "Esse usuário não pode ser adicionado ao grupo." }, { status: 400 });
+  }
+
+  const bannedCount = await prisma.groupBan.count({ where: { conversationId: params.id, userId: { in: newIds } } });
+  if (bannedCount > 0) {
+    return NextResponse.json({ error: "Um dos usuários selecionados está banido desse grupo." }, { status: 400 });
+  }
+
   if (newIds.length > 0) {
     await prisma.conversationMember.createMany({
       data: newIds.map((id) => ({ userId: id, conversationId: params.id })),

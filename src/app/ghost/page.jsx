@@ -25,6 +25,8 @@ function GhostPanel() {
   const [newUsername, setNewUsername] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [creatingUser, setCreatingUser] = useState(false);
+  const [bansByGroup, setBansByGroup] = useState({});
+  const [banSelect, setBanSelect] = useState({});
 
   function loadAll() {
     fetch("/api/admin/users", { credentials: "include" })
@@ -39,6 +41,49 @@ function GhostPanel() {
   }
 
   useEffect(loadAll, []);
+
+  useEffect(() => {
+    conversations
+      .filter((c) => c.isGroup)
+      .forEach((c) => {
+        fetch(`/api/admin/conversations/${c.id}/bans`, { credentials: "include" })
+          .then((res) => (res.ok ? res.json() : []))
+          .then((data) => setBansByGroup((prev) => ({ ...prev, [c.id]: data })));
+      });
+  }, [conversations]);
+
+  async function banUser(conversationId) {
+    const targetId = banSelect[conversationId];
+    if (!targetId) return;
+    const res = await fetch(`/api/admin/conversations/${conversationId}/bans`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ userId: targetId }),
+    });
+    if (res.ok) {
+      const updated = await fetch(`/api/admin/conversations/${conversationId}/bans`, { credentials: "include" }).then((r) => r.json());
+      setBansByGroup((prev) => ({ ...prev, [conversationId]: updated }));
+      setBanSelect((prev) => ({ ...prev, [conversationId]: "" }));
+      setStatus("Usuário banido desse grupo.");
+    } else {
+      setStatus("Erro ao banir usuário.");
+    }
+  }
+
+  async function unbanUser(conversationId, userId, username) {
+    const res = await fetch(`/api/admin/conversations/${conversationId}/bans/${userId}`, {
+      method: "DELETE",
+      credentials: "include",
+    });
+    if (res.ok) {
+      setBansByGroup((prev) => ({
+        ...prev,
+        [conversationId]: (prev[conversationId] || []).filter((b) => b.userId !== userId),
+      }));
+      setStatus(`"${username}" pode ser adicionado ao grupo de novo.`);
+    }
+  }
 
   async function toggleRegistration() {
     const next = !registrationEnabled;
@@ -299,6 +344,60 @@ function GhostPanel() {
                   </span>
                 ))}
               </div>
+
+              <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid var(--border)" }}>
+                <p style={{ margin: "0 0 6px", fontSize: 11, color: "var(--text-faint)" }}>
+                  Banidos desse grupo (não podem ser adicionados)
+                </p>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 8 }}>
+                  {(bansByGroup[c.id] || []).length === 0 && (
+                    <span style={{ fontSize: 12, color: "var(--text-faint)" }}>Ninguém banido.</span>
+                  )}
+                  {(bansByGroup[c.id] || []).map((b) => (
+                    <span
+                      key={b.userId}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 4,
+                        fontSize: 12,
+                        background: "var(--surface-hover)",
+                        borderRadius: 999,
+                        padding: "2px 8px",
+                        color: "var(--danger)",
+                      }}
+                    >
+                      {b.username}
+                      <button onClick={() => unbanUser(c.id, b.userId, b.username)} title="Desbanir" style={{ fontSize: 11 }}>
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                </div>
+                <div className="ghost-message-form">
+                  <div className="ghost-select-wrap">
+                    <select
+                      value={banSelect[c.id] || ""}
+                      onChange={(e) => setBanSelect((prev) => ({ ...prev, [c.id]: e.target.value }))}
+                      className="ghost-select"
+                    >
+                      <option value="">Selecione um usuário...</option>
+                      {users
+                        .filter((u) => !c.members.some((m) => m.id === u.id))
+                        .filter((u) => !(bansByGroup[c.id] || []).some((b) => b.userId === u.id))
+                        .map((u) => (
+                          <option key={u.id} value={u.id}>
+                            {u.username}
+                          </option>
+                        ))}
+                    </select>
+                    <span className="ghost-select-arrow">▾</span>
+                  </div>
+                  <button onClick={() => banUser(c.id)} disabled={!banSelect[c.id]} style={{ fontSize: 12 }}>
+                    Banir
+                  </button>
+                </div>
+              </div>
             </div>
           ))}
         </div>
@@ -367,6 +466,39 @@ function GhostPanel() {
         .ghost-message-form {
           display: flex;
           gap: 8px;
+        }
+
+        .ghost-select-wrap {
+          position: relative;
+          flex: 1;
+          min-width: 0;
+        }
+
+        .ghost-select {
+          appearance: none;
+          -webkit-appearance: none;
+          width: 100%;
+          background: var(--surface);
+          color: var(--text);
+          border: 1px solid var(--input-border);
+          border-radius: 8px;
+          padding: 8px 28px 8px 10px;
+          font-size: 12px;
+        }
+
+        .ghost-select option {
+          background: var(--surface);
+          color: var(--text);
+        }
+
+        .ghost-select-arrow {
+          position: absolute;
+          right: 10px;
+          top: 50%;
+          transform: translateY(-50%);
+          font-size: 10px;
+          color: var(--text-faint);
+          pointer-events: none;
         }
 
         @media (max-width: 560px) {
