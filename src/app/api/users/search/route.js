@@ -3,22 +3,22 @@ import prisma from "@/lib/prisma";
 import { getUserIdFromRequest } from "@/lib/auth";
 
 // Busca usuários pelo nome (contém, sem diferenciar maiúsculas/minúsculas).
-// A conta Ghost nunca aparece na busca.
+// Sem "q", lista todo mundo em ordem alfabética. A conta Ghost nunca
+// aparece.
 export async function GET(request) {
   const userId = getUserIdFromRequest(request);
   if (!userId) return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
 
   const q = new URL(request.url).searchParams.get("q")?.trim() || "";
-  if (!q) return NextResponse.json([]);
 
   const users = await prisma.user.findMany({
     where: {
-      username: { contains: q, mode: "insensitive" },
       isGhost: false,
       id: { not: userId },
+      ...(q ? { username: { contains: q, mode: "insensitive" } } : {}),
     },
     select: { id: true, username: true, avatarColor: true, avatarUrl: true },
-    take: 20,
+    take: q ? 20 : undefined,
     orderBy: { username: "asc" },
   });
 

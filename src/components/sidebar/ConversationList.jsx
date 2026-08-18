@@ -1,6 +1,9 @@
 import ConversationItem from "./ConversationItem.jsx";
 
-export default function ConversationList({ conversations, activeId, onSelect, onNewGroup, onNewConversation }) {
+export default function ConversationList({ conversations, activeId, onSelect, onHide, onNewGroup, onNewConversation }) {
+  const privateConversations = conversations.filter((c) => !c.isGroup);
+  const groupConversations = conversations.filter((c) => c.isGroup);
+
   return (
     <div className="sidebar">
       <div
@@ -25,9 +28,24 @@ export default function ConversationList({ conversations, activeId, onSelect, on
         {conversations.length === 0 && (
           <p style={{ padding: 16, fontSize: 13, color: "var(--text-faint)" }}>Nenhuma conversa ainda. Comece uma nova!</p>
         )}
-        {conversations.map((c) => (
-          <ConversationItem key={c.id} conversation={c} isActive={c.id === activeId} onClick={() => onSelect(c)} />
-        ))}
+
+        {privateConversations.length > 0 && (
+          <>
+            <p className="sidebar-section-label">Conversas</p>
+            {privateConversations.map((c) => (
+              <ConversationItem key={c.id} conversation={c} isActive={c.id === activeId} onClick={() => onSelect(c)} onHide={onHide} />
+            ))}
+          </>
+        )}
+
+        {groupConversations.length > 0 && (
+          <>
+            <p className="sidebar-section-label">Grupos</p>
+            {groupConversations.map((c) => (
+              <ConversationItem key={c.id} conversation={c} isActive={c.id === activeId} onClick={() => onSelect(c)} onHide={onHide} />
+            ))}
+          </>
+        )}
       </div>
     </div>
   );

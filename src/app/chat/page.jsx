@@ -233,6 +233,7 @@ export default function ChatPage() {
             conversations={conversations}
             activeId={activeConversation?.id}
             onSelect={handleSelectConversation}
+            onHide={removeConversationFromView}
             onNewGroup={() => setShowGroupModal(true)}
             onNewConversation={() => setShowNewConversationModal(true)}
           />

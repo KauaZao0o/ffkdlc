@@ -462,6 +462,16 @@ body.call-active .app-layout {
   background: var(--surface);
 }
 
+.sidebar-section-label {
+  margin: 12px 0 2px;
+  padding: 0 16px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
 .chat-main {
   flex: 1;
   min-width: 0;

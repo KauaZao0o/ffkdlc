@@ -10,22 +10,21 @@ export default function SearchDrawer({ onClose }) {
   const [loading, setLoading] = useState(false);
   const { openProfile } = useProfileView();
 
+  // Sem digitar nada, já mostra todo mundo em ordem alfabética (a API já
+  // devolve assim) - a busca só filtra essa mesma lista.
   useEffect(() => {
     const trimmed = query.trim();
-    if (!trimmed) {
-      setResults([]);
-      setLoading(false);
-      return;
-    }
-
     setLoading(true);
-    const timeout = setTimeout(() => {
-      fetch(`/api/users/search?q=${encodeURIComponent(trimmed)}`, { credentials: "include" })
-        .then((res) => res.json())
-        .then((data) => setResults(Array.isArray(data) ? data : []))
-        .catch(() => setResults([]))
-        .finally(() => setLoading(false));
-    }, 250);
+    const timeout = setTimeout(
+      () => {
+        fetch(`/api/users/search${trimmed ? `?q=${encodeURIComponent(trimmed)}` : ""}`, { credentials: "include" })
+          .then((res) => res.json())
+          .then((data) => setResults(Array.isArray(data) ? data : []))
+          .catch(() => setResults([]))
+          .finally(() => setLoading(false));
+      },
+      trimmed ? 250 : 0
+    );
 
     return () => clearTimeout(timeout);
   }, [query]);
@@ -55,8 +54,10 @@ export default function SearchDrawer({ onClose }) {
 
         {loading && <p style={{ fontSize: 13, color: "var(--text-faint)" }}>Buscando...</p>}
 
-        {!loading && query.trim() && results.length === 0 && (
-          <p style={{ fontSize: 13, color: "var(--text-faint)" }}>Nenhum usuário encontrado.</p>
+        {!loading && results.length === 0 && (
+          <p style={{ fontSize: 13, color: "var(--text-faint)" }}>
+            {query.trim() ? "Nenhum usuário encontrado." : "Nenhum usuário cadastrado ainda."}
+          </p>
         )}
 
         <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>

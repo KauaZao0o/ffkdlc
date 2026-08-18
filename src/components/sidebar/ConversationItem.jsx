@@ -3,15 +3,36 @@
 import { useProfileView } from "@/context/ProfileViewContext.jsx";
 import Avatar from "@/components/common/Avatar.jsx";
 
-export default function ConversationItem({ conversation, isActive, onClick }) {
+export default function ConversationItem({ conversation, isActive, onClick, onHide }) {
   const otherUser = !conversation.isGroup ? conversation.participants?.[0] : null;
   const { openProfile } = useProfileView();
+
+  async function handleHide(e) {
+    e.stopPropagation();
+    const confirmed = window.confirm(
+      `Apagar "${conversation.name}" só para você? Ela continua existindo para os outros participantes.`
+    );
+    if (!confirmed) return;
+
+    const res = await fetch(`/api/conversations/${conversation.id}/hide`, {
+      method: "POST",
+      credentials: "include",
+    });
+
+    if (res.ok) {
+      onHide(conversation.id);
+    } else {
+      const data = await res.json().catch(() => null);
+      alert(data?.error || "Não foi possível apagar a conversa.");
+    }
+  }
 
   return (
     <div
       onClick={onClick}
       style={{
         display: "flex",
+        alignItems: "center",
         gap: 10,
         padding: "10px 16px",
         cursor: "pointer",
@@ -82,6 +103,23 @@ export default function ConversationItem({ conversation, isActive, onClick }) {
           {conversation.lastMessage?.content || "Nenhuma mensagem ainda"}
         </p>
       </div>
+      <button
+        onClick={handleHide}
+        title="Apagar essa conversa só para você"
+        style={{
+          flexShrink: 0,
+          width: 22,
+          height: 22,
+          padding: 0,
+          borderRadius: "50%",
+          border: "none",
+          background: "transparent",
+          color: "var(--text-faint)",
+          fontSize: 13,
+        }}
+      >
+        ✕
+      </button>
     </div>
   );
 }
