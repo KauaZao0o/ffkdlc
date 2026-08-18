@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useAuth } from "@/context/AuthContext.jsx";
 
 // Painel só é útil pra quem está logado como a conta Ghost - as rotas
@@ -161,7 +162,12 @@ function GhostPanel() {
 
   return (
     <div className="ghost-page">
-      <h1 style={{ fontSize: 20 }}>Ghost</h1>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+        <h1 style={{ fontSize: 20, margin: 0 }}>Ghost</h1>
+        <Link href="/chat" className="ghost-back-link">
+          ← Voltar para o chat
+        </Link>
+      </div>
       {status && <p style={{ fontSize: 13, color: "var(--text-muted)" }}>{status}</p>}
 
       <section style={{ marginTop: 24, padding: 12, background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8 }}>

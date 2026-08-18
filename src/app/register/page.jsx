@@ -37,28 +37,44 @@ export default function RegisterPage() {
 
   if (!registrationEnabled) {
     return (
-      <div style={{ maxWidth: 360, margin: "80px auto", padding: 24 }}>
-        <h2>Criar conta</h2>
-        <p style={{ fontSize: 14, color: "var(--text-muted)" }}>O cadastro está desativado no momento.</p>
-        <p style={{ fontSize: 14, marginTop: 16 }}>
-          <Link href="/login">Voltar para o login</Link>
-        </p>
+      <div className="auth-page">
+        <div className="auth-card">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/ffpkdlc-icon.png" alt="" className="auth-logo" />
+          <h2 className="auth-title">Criar conta</h2>
+          <p className="auth-muted">O cadastro está desativado no momento.</p>
+          <p className="auth-footer">
+            <Link href="/login">Voltar para o login</Link>
+          </p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div style={{ maxWidth: 360, margin: "80px auto", padding: 24 }}>
-      <h2>Criar conta</h2>
-      <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-        <input placeholder="Usuário" value={username} onChange={(e) => setUsername(e.target.value)} required />
-        <input type="password" placeholder="Senha" value={password} onChange={(e) => setPassword(e.target.value)} required />
-        {error && <p style={{ color: "var(--danger)", fontSize: 13 }}>{error}</p>}
-        <button type="submit" className="primary">Cadastrar</button>
-      </form>
-      <p style={{ fontSize: 14, marginTop: 16 }}>
-        Já tem conta? <Link href="/login">Entrar</Link>
-      </p>
+    <div className="auth-page">
+      <div className="auth-card">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/ffpkdlc-icon.png" alt="" className="auth-logo" />
+        <h2 className="auth-title">Criar conta</h2>
+        <form onSubmit={handleSubmit} className="auth-form">
+          <input placeholder="Usuário" value={username} onChange={(e) => setUsername(e.target.value)} required />
+          <input
+            type="password"
+            placeholder="Senha"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+          />
+          {error && <p className="auth-error">{error}</p>}
+          <button type="submit" className="primary">
+            Cadastrar
+          </button>
+        </form>
+        <p className="auth-footer">
+          Já tem conta? <Link href="/login">Entrar</Link>
+        </p>
+      </div>
     </div>
   );
 }

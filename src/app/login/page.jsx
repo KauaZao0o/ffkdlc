@@ -32,19 +32,31 @@ export default function LoginPage() {
   }
 
   return (
-    <div style={{ maxWidth: 360, margin: "80px auto", padding: 24 }}>
-      <h2>Entrar</h2>
-      <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-        <input placeholder="Usuário" value={username} onChange={(e) => setUsername(e.target.value)} required />
-        <input type="password" placeholder="Senha" value={password} onChange={(e) => setPassword(e.target.value)} required />
-        {error && <p style={{ color: "var(--danger)", fontSize: 13 }}>{error}</p>}
-        <button type="submit" className="primary">Entrar</button>
-      </form>
-      {registrationEnabled && (
-        <p style={{ fontSize: 14, marginTop: 16 }}>
-          Não tem conta? <Link href="/register">Cadastre-se</Link>
-        </p>
-      )}
+    <div className="auth-page">
+      <div className="auth-card">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/ffpkdlc-icon.png" alt="" className="auth-logo" />
+        <h2 className="auth-title">Entrar</h2>
+        <form onSubmit={handleSubmit} className="auth-form">
+          <input placeholder="Usuário" value={username} onChange={(e) => setUsername(e.target.value)} required />
+          <input
+            type="password"
+            placeholder="Senha"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+          />
+          {error && <p className="auth-error">{error}</p>}
+          <button type="submit" className="primary">
+            Entrar
+          </button>
+        </form>
+        {registrationEnabled && (
+          <p className="auth-footer">
+            Não tem conta? <Link href="/register">Cadastre-se</Link>
+          </p>
+        )}
+      </div>
     </div>
   );
 }

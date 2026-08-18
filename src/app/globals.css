@@ -22,6 +22,7 @@
   --bubble-other-text: #1c1c1a;
   --group-avatar-bg: #dbe9fb;
   --group-avatar-fg: #185fa5;
+  --focus-ring: rgba(28, 28, 26, 0.12);
 }
 
 [data-theme="dark"] {
@@ -44,6 +45,7 @@
   --bubble-other-text: #f1f1ef;
   --group-avatar-bg: #26364a;
   --group-avatar-fg: #7fb3ec;
+  --focus-ring: rgba(241, 241, 239, 0.14);
 }
 
 html, body {
@@ -189,6 +191,123 @@ button:disabled {
 
 .theme-switch input:checked + .theme-switch-track::before {
   transform: translateX(18px);
+}
+
+/* ---------- Telas de login/cadastro ---------- */
+
+.auth-page {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 360px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 32px 28px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.1);
+}
+
+[data-theme="dark"] .auth-card {
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+}
+
+.auth-logo {
+  display: block;
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
+  margin: 0 auto 16px;
+}
+
+.auth-title {
+  margin: 0 0 24px;
+  text-align: center;
+  font-size: 20px;
+}
+
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.auth-form input {
+  padding: 11px 14px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.auth-form input:focus {
+  outline: none;
+  border-color: var(--primary-bg);
+  box-shadow: 0 0 0 3px var(--focus-ring);
+}
+
+.auth-form button.primary {
+  margin-top: 6px;
+  padding: 11px 14px;
+  font-weight: 600;
+  border-radius: 10px;
+  transition: filter 0.15s ease;
+}
+
+.auth-form button.primary:hover {
+  filter: brightness(1.12);
+}
+
+.auth-error {
+  color: var(--danger);
+  font-size: 13px;
+  margin: 0;
+}
+
+.auth-muted {
+  color: var(--text-muted);
+  font-size: 14px;
+  margin: 0;
+  text-align: center;
+}
+
+.auth-footer {
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-muted);
+  margin: 20px 0 0;
+}
+
+.auth-footer a {
+  color: var(--text);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.auth-footer a:hover {
+  text-decoration: underline;
+}
+
+.ghost-back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  padding: 7px 16px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 13px;
+  text-decoration: none;
+  transition: background 0.15s ease;
+}
+
+.ghost-back-link:hover {
+  background: var(--surface-hover);
 }
 
 /* ---------- Estrutura geral ---------- */
