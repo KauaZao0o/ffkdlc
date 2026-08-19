@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext.jsx";
+import { getSupabaseBrowserClient } from "@/lib/supabaseClient";
 
 // Painel só é útil pra quem está logado como a conta Ghost - as rotas
 // /api/admin/* já recusam qualquer outro usuário (404, pra não denunciar
@@ -27,6 +28,18 @@ function GhostPanel() {
   const [creatingUser, setCreatingUser] = useState(false);
   const [bansByGroup, setBansByGroup] = useState({});
   const [banSelect, setBanSelect] = useState({});
+  const settingsChannelRef = useRef(null);
+
+  // Canal só de "avisar quem está com /login ou /register aberto" que o
+  // cadastro público mudou - assim a tela deles atualiza na hora, sem
+  // precisar recarregar.
+  useEffect(() => {
+    const supabase = getSupabaseBrowserClient();
+    const channel = supabase.channel("app-settings");
+    channel.subscribe();
+    settingsChannelRef.current = channel;
+    return () => supabase.removeChannel(channel);
+  }, []);
 
   function loadAll() {
     fetch("/api/admin/users", { credentials: "include" })
@@ -99,6 +112,11 @@ function GhostPanel() {
       setStatus("Erro ao atualizar o cadastro público.");
       return;
     }
+    settingsChannelRef.current?.send({
+      type: "broadcast",
+      event: "registration-toggle",
+      payload: { registrationEnabled: next },
+    });
     setStatus(next ? "Cadastro público ativado." : "Cadastro público desativado.");
   }
 

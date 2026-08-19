@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext.jsx";
 import ThemeToggle from "@/components/common/ThemeToggle.jsx";
+import { getSupabaseBrowserClient } from "@/lib/supabaseClient";
 
 export default function LoginPage() {
   const [username, setUsername] = useState("");
@@ -19,6 +20,19 @@ export default function LoginPage() {
       .then((res) => res.json())
       .then((data) => setRegistrationEnabled(data.registrationEnabled !== false))
       .catch(() => {});
+  }, []);
+
+  // Se o Ghost ligar/desligar o cadastro público enquanto essa tela está
+  // aberta, atualiza na hora - sem precisar recarregar a página.
+  useEffect(() => {
+    const supabase = getSupabaseBrowserClient();
+    const channel = supabase
+      .channel("app-settings")
+      .on("broadcast", { event: "registration-toggle" }, ({ payload }) => {
+        setRegistrationEnabled(payload.registrationEnabled !== false);
+      })
+      .subscribe();
+    return () => supabase.removeChannel(channel);
   }, []);
 
   async function handleSubmit(e) {
