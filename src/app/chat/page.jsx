@@ -8,6 +8,7 @@ import { CallProvider, useCall } from "@/context/CallContext.jsx";
 import { MusicPlayerProvider, useMusicPlayer } from "@/context/MusicPlayerContext.jsx";
 import { PresenceProvider } from "@/context/PresenceContext.jsx";
 import { ProfileViewProvider } from "@/context/ProfileViewContext.jsx";
+import { GameProvider } from "@/context/GameContext.jsx";
 import { getSupabaseBrowserClient } from "@/lib/supabaseClient";
 import ConversationList from "@/components/sidebar/ConversationList.jsx";
 import ChatWindow from "@/components/chat/ChatWindow.jsx";
@@ -20,6 +21,8 @@ import NewConversationModal from "@/components/sidebar/NewConversationModal.jsx"
 import SettingsModal from "@/components/settings/SettingsModal.jsx";
 import MusicPlayerDrawer from "@/components/player/MusicPlayerDrawer.jsx";
 import SearchDrawer from "@/components/search/SearchDrawer.jsx";
+import GamesDrawer from "@/components/games/GamesDrawer.jsx";
+import GameOverlay from "@/components/games/GameOverlay.jsx";
 import Avatar from "@/components/common/Avatar.jsx";
 
 // Fica dentro do CallProvider pra poder usar useCall() e mostrar a chamada
@@ -36,18 +39,6 @@ function GlobalCallOverlay() {
   );
 }
 
-function MusicPlayerButton() {
-  const { drawerOpen, openDrawer, closeDrawer } = useMusicPlayer();
-  return (
-    <>
-      <button className="icon-button" onClick={openDrawer} title="Player de música">
-        🎵
-      </button>
-      {drawerOpen && <MusicPlayerDrawer onClose={closeDrawer} />}
-    </>
-  );
-}
-
 function SearchButton() {
   const [showSearch, setShowSearch] = useState(false);
   return (
@@ -57,6 +48,115 @@ function SearchButton() {
       </button>
       {showSearch && <SearchDrawer onClose={() => setShowSearch(false)} />}
     </>
+  );
+}
+
+// Agrupa os botões usados com menos frequência (jogos, player de música,
+// som, painel do Ghost) num só menu "⋯" - a barra do topo estava com
+// ícone demais espremidos lado a lado.
+function MoreMenu({ isGhost, onOpenGhostPanel }) {
+  const [open, setOpen] = useState(false);
+  const [showGames, setShowGames] = useState(false);
+  const { drawerOpen: showMusic, openDrawer: openMusic, closeDrawer: closeMusic } = useMusicPlayer();
+  const { enabled: soundEnabled, toggle: toggleSound } = useSound();
+  const menuRef = useRef(null);
+  const buttonRef = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function handleOutsideClick(e) {
+      if (!menuRef.current?.contains(e.target) && !buttonRef.current?.contains(e.target)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleOutsideClick);
+    document.addEventListener("touchstart", handleOutsideClick);
+    return () => {
+      document.removeEventListener("mousedown", handleOutsideClick);
+      document.removeEventListener("touchstart", handleOutsideClick);
+    };
+  }, [open]);
+
+  const itemStyle = {
+    display: "flex",
+    alignItems: "center",
+    gap: 10,
+    width: "100%",
+    textAlign: "left",
+    border: "none",
+    borderRadius: 0,
+    padding: "10px 14px",
+    fontSize: 13,
+    background: "var(--surface)",
+    color: "var(--text)",
+  };
+
+  return (
+    <div style={{ position: "relative" }}>
+      <button ref={buttonRef} className="icon-button" onClick={() => setOpen((o) => !o)} title="Mais opções">
+        ⋯
+      </button>
+
+      {open && (
+        <div
+          ref={menuRef}
+          style={{
+            position: "absolute",
+            top: "calc(100% + 6px)",
+            right: 0,
+            width: 220,
+            background: "var(--surface)",
+            border: "1px solid var(--border)",
+            borderRadius: 10,
+            boxShadow: "0 4px 12px rgba(0,0,0,0.25)",
+            overflow: "hidden",
+            zIndex: 40,
+          }}
+        >
+          {isGhost && (
+            <button
+              onClick={() => {
+                setOpen(false);
+                onOpenGhostPanel();
+              }}
+              style={itemStyle}
+            >
+              👻 Painel Ghost
+            </button>
+          )}
+          <button
+            onClick={() => {
+              setOpen(false);
+              setShowGames(true);
+            }}
+            style={{ ...itemStyle, borderTop: isGhost ? "1px solid var(--border)" : "none" }}
+          >
+            🎮 Jogos
+          </button>
+          <button
+            onClick={() => {
+              setOpen(false);
+              openMusic();
+            }}
+            style={{ ...itemStyle, borderTop: "1px solid var(--border)" }}
+          >
+            🎵 Player de música
+          </button>
+          <button
+            onClick={() => {
+              setOpen(false);
+              toggleSound();
+            }}
+            style={{ ...itemStyle, borderTop: "1px solid var(--border)" }}
+          >
+            {soundEnabled ? "🔔 Desativar som" : "🔕 Ativar som"}
+          </button>
+        </div>
+      )}
+
+      {showGames && <GamesDrawer onClose={() => setShowGames(false)} />}
+      {showMusic && <MusicPlayerDrawer onClose={closeMusic} />}
+    </div>
   );
 }
 
@@ -70,7 +170,7 @@ export default function ChatPage() {
   // No celular, alterna entre ver a lista de conversas e ver o chat aberto.
   const [mobileView, setMobileView] = useState("list");
   const { user, loading, logout } = useAuth();
-  const { enabled: soundEnabled, toggle: toggleSound, play: playSound } = useSound();
+  const { play: playSound } = useSound();
   const router = useRouter();
 
   const notifiedIdsRef = useRef(new Set());
@@ -188,19 +288,15 @@ export default function ChatPage() {
   return (
     <MusicPlayerProvider>
     <PresenceProvider user={user}>
+    <GameProvider user={user}>
     <ProfileViewProvider>
     <CallProvider user={user} conversations={conversations}>
       <div className="app-shell">
         <div className="top-bar">
           <p className="top-bar-title">{activeConversation?.name || "ffpkdlc"}</p>
           <div className="top-bar-actions">
-            {user.isGhost && (
-              <button className="icon-button" onClick={() => router.push("/ghost")} title="Painel Ghost">
-                👻
-              </button>
-            )}
             <SearchButton />
-            <MusicPlayerButton />
+            <MoreMenu isGhost={user.isGhost} onOpenGhostPanel={() => router.push("/ghost")} />
             <button
               className="icon-button"
               onClick={() => setShowSettings(true)}
@@ -208,13 +304,6 @@ export default function ChatPage() {
               style={{ padding: 0, overflow: "hidden" }}
             >
               <Avatar username={user.username} avatarColor={user.avatarColor} avatarUrl={user.avatarUrl} size={34} />
-            </button>
-            <button
-              className="icon-button"
-              onClick={toggleSound}
-              title={soundEnabled ? "Desativar som de notificações e chamadas" : "Ativar som de notificações e chamadas"}
-            >
-              {soundEnabled ? "🔔" : "🔕"}
             </button>
             <button
               onClick={async () => {
@@ -282,9 +371,11 @@ export default function ChatPage() {
             aviso de "alguém ligando") aparece independente de qual
             conversa está aberta. */}
         <GlobalCallOverlay />
+        <GameOverlay />
       </div>
     </CallProvider>
     </ProfileViewProvider>
+    </GameProvider>
     </PresenceProvider>
     </MusicPlayerProvider>
   );
