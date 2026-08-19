@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext.jsx";
+import ThemeToggle from "@/components/common/ThemeToggle.jsx";
 
 export default function LoginPage() {
   const [username, setUsername] = useState("");
@@ -34,6 +35,7 @@ export default function LoginPage() {
   return (
     <div className="auth-page">
       <div className="auth-card">
+        <ThemeToggle className="auth-theme-toggle" />
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/ffpkdlc-icon.png" alt="" className="auth-logo" />
         <h2 className="auth-title">Entrar</h2>
