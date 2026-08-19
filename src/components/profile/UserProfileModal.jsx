@@ -61,24 +61,13 @@ export default function UserProfileModal({ username, onClose }) {
 
         {profile && (
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, marginTop: -8 }}>
-            <div style={{ position: "relative" }}>
-              <Avatar username={profile.username} avatarColor={profile.avatarColor} avatarUrl={profile.avatarUrl} size={80} />
-              {isOnline && (
-                <span
-                  title="Online"
-                  style={{
-                    position: "absolute",
-                    bottom: 2,
-                    right: 2,
-                    width: 16,
-                    height: 16,
-                    borderRadius: "50%",
-                    background: "var(--success)",
-                    border: "2px solid var(--surface)",
-                  }}
-                />
-              )}
-            </div>
+            <Avatar
+              username={profile.username}
+              avatarColor={profile.avatarColor}
+              avatarUrl={profile.avatarUrl}
+              size={80}
+              isOnline={isOnline}
+            />
 
             <h3 style={{ margin: "12px 0 0" }}>{profile.username}</h3>
 

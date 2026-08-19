@@ -1,11 +1,13 @@
 "use client";
 
 import { useProfileView } from "@/context/ProfileViewContext.jsx";
+import { usePresence } from "@/context/PresenceContext.jsx";
 import Avatar from "@/components/common/Avatar.jsx";
 
 export default function ConversationItem({ conversation, isActive, onClick, onHide }) {
   const otherUser = !conversation.isGroup ? conversation.participants?.[0] : null;
   const { openProfile } = useProfileView();
+  const { onlineMap } = usePresence();
 
   async function handleHide(e) {
     e.stopPropagation();
@@ -74,7 +76,12 @@ export default function ConversationItem({ conversation, isActive, onClick, onHi
           title={`Ver perfil de ${otherUser?.username}`}
           style={{ border: "none", background: "transparent", padding: 0, cursor: "pointer", flexShrink: 0 }}
         >
-          <Avatar username={conversation.name} avatarColor={otherUser?.avatarColor} avatarUrl={otherUser?.avatarUrl} />
+          <Avatar
+            username={conversation.name}
+            avatarColor={otherUser?.avatarColor}
+            avatarUrl={otherUser?.avatarUrl}
+            isOnline={!!onlineMap[otherUser?.id]}
+          />
         </button>
       )}
       <div style={{ flex: 1, minWidth: 0 }}>

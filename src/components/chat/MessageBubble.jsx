@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Avatar from "@/components/common/Avatar.jsx";
 import AudioMessage from "./AudioMessage.jsx";
 import { useProfileView } from "@/context/ProfileViewContext.jsx";
+import { usePresence } from "@/context/PresenceContext.jsx";
 
 const MENTION_SPLIT_REGEX = /(@[a-zA-Z0-9_]+)/g;
 const MENTION_TEST_REGEX = /^@[a-zA-Z0-9_]+$/;
@@ -117,9 +118,11 @@ const MENU_WIDTH = 180;
 export default function MessageBubble({ message, isOwn, canDeleteForEveryone, onHideForMe, onDeleteForEveryone, onReply }) {
   const [showMenu, setShowMenu] = useState(false);
   const [menuPos, setMenuPos] = useState(null);
+  const [showLightbox, setShowLightbox] = useState(false);
   const menuButtonRef = useRef(null);
   const menuRef = useRef(null);
   const { openProfile } = useProfileView();
+  const { onlineMap } = usePresence();
   const isImage = message.type === "image" && message.fileUrl;
   const isAudio = message.type === "audio" && message.fileUrl;
   const isFile = message.type === "file" && message.fileUrl;
@@ -234,6 +237,7 @@ export default function MessageBubble({ message, isOwn, canDeleteForEveryone, on
             avatarColor={message.sender?.avatarColor}
             avatarUrl={message.sender?.avatarUrl}
             size={28}
+            isOnline={!!onlineMap[message.sender?.id]}
           />
         </button>
         <div style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
@@ -289,7 +293,16 @@ export default function MessageBubble({ message, isOwn, canDeleteForEveryone, on
                 <img
                   src={message.fileUrl}
                   alt="Imagem enviada no chat"
-                  style={{ maxWidth: "100%", width: 220, maxHeight: 260, borderRadius: 8, display: "block", objectFit: "cover" }}
+                  onClick={() => setShowLightbox(true)}
+                  style={{
+                    maxWidth: "100%",
+                    width: 220,
+                    maxHeight: 260,
+                    borderRadius: 8,
+                    display: "block",
+                    objectFit: "cover",
+                    cursor: "zoom-in",
+                  }}
                 />
               ) : isAudio ? (
                 <AudioMessage src={message.fileUrl} isOwn={isOwn} />
@@ -425,6 +438,48 @@ export default function MessageBubble({ message, isOwn, canDeleteForEveryone, on
               Apagar para todos
             </button>
           )}
+        </div>
+      )}
+
+      {isImage && showLightbox && (
+        <div
+          onClick={() => setShowLightbox(false)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 100,
+            background: "rgba(0,0,0,0.85)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 24,
+            cursor: "zoom-out",
+          }}
+        >
+          <img
+            src={message.fileUrl}
+            alt="Imagem enviada no chat"
+            onClick={(e) => e.stopPropagation()}
+            style={{ maxWidth: "92vw", maxHeight: "92vh", borderRadius: 8, objectFit: "contain", cursor: "default" }}
+          />
+          <button
+            onClick={() => setShowLightbox(false)}
+            title="Fechar"
+            style={{
+              position: "fixed",
+              top: 16,
+              right: 16,
+              width: 34,
+              height: 34,
+              borderRadius: "50%",
+              border: "none",
+              background: "rgba(255,255,255,0.15)",
+              color: "white",
+              fontSize: 16,
+            }}
+          >
+            ✕
+          </button>
         </div>
       )}
     </div>

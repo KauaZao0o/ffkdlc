@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { usePresence } from "@/context/PresenceContext.jsx";
 import Avatar from "@/components/common/Avatar.jsx";
 
 export default function NewConversationModal({ onClose, onStarted }) {
@@ -8,6 +9,7 @@ export default function NewConversationModal({ onClose, onStarted }) {
   const [loadingUsers, setLoadingUsers] = useState(true);
   const [startingId, setStartingId] = useState(null);
   const [error, setError] = useState("");
+  const { onlineMap } = usePresence();
 
   useEffect(() => {
     fetch("/api/users", { credentials: "include" })
@@ -95,14 +97,14 @@ export default function NewConversationModal({ onClose, onStarted }) {
                 marginBottom: 2,
               }}
             >
-              <Avatar username={u.username} avatarColor={u.avatarColor} avatarUrl={u.avatarUrl} size={34} />
+              <Avatar
+                username={u.username}
+                avatarColor={u.avatarColor}
+                avatarUrl={u.avatarUrl}
+                size={34}
+                isOnline={!!onlineMap[u.id]}
+              />
               <span style={{ flex: 1, fontSize: 14 }}>{u.username}</span>
-              {u.isOnline && (
-                <span
-                  title="Online"
-                  style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--success)", flexShrink: 0 }}
-                />
-              )}
               {startingId === u.id && <span style={{ fontSize: 12, color: "var(--text-muted)" }}>abrindo...</span>}
             </button>
           ))}

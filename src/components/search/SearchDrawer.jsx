@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useProfileView } from "@/context/ProfileViewContext.jsx";
+import { usePresence } from "@/context/PresenceContext.jsx";
 import Avatar from "@/components/common/Avatar.jsx";
 
 export default function SearchDrawer({ onClose }) {
@@ -9,6 +10,7 @@ export default function SearchDrawer({ onClose }) {
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const { openProfile } = useProfileView();
+  const { onlineMap } = usePresence();
 
   // Sem digitar nada, já mostra todo mundo em ordem alfabética (a API já
   // devolve assim) - a busca só filtra essa mesma lista.
@@ -77,7 +79,13 @@ export default function SearchDrawer({ onClose }) {
                 background: "transparent",
               }}
             >
-              <Avatar username={u.username} avatarColor={u.avatarColor} avatarUrl={u.avatarUrl} size={34} />
+              <Avatar
+                username={u.username}
+                avatarColor={u.avatarColor}
+                avatarUrl={u.avatarUrl}
+                size={34}
+                isOnline={!!onlineMap[u.id]}
+              />
               <span style={{ fontSize: 14 }}>{u.username}</span>
             </button>
           ))}
