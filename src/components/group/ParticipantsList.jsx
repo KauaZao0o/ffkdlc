@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext.jsx";
 import { useProfileView } from "@/context/ProfileViewContext.jsx";
+import { usePresence } from "@/context/PresenceContext.jsx";
 import AddParticipantsModal from "./AddParticipantsModal.jsx";
 import Avatar from "@/components/common/Avatar.jsx";
 import { uploadChatFile } from "@/lib/uploadImage";
@@ -11,6 +12,7 @@ export default function ParticipantsList({ conversation, onGroupDeleted, onLeftG
   const [participants, setParticipants] = useState([]);
   const [showAddModal, setShowAddModal] = useState(false);
   const { user } = useAuth();
+  const { onlineMap } = usePresence();
 
   const [groupName, setGroupName] = useState(conversation?.name || "");
   const [groupAvatarUrl, setGroupAvatarUrl] = useState(conversation?.avatarUrl || "");
@@ -292,7 +294,13 @@ export default function ParticipantsList({ conversation, onGroupDeleted, onLeftG
                 textAlign: "left",
               }}
             >
-              <Avatar username={p.username} avatarColor={p.avatarColor} avatarUrl={p.avatarUrl} size={28} />
+              <Avatar
+                username={p.username}
+                avatarColor={p.avatarColor}
+                avatarUrl={p.avatarUrl}
+                size={28}
+                isOnline={!!onlineMap[p.id]}
+              />
               <span style={{ margin: 0, fontSize: 13, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {p.username}
                 {p.isAdmin ? " (admin)" : ""}

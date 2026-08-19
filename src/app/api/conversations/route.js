@@ -63,8 +63,15 @@ export async function POST(request) {
     return NextResponse.json({ error: "Informe o usuário com quem deseja conversar." }, { status: 400 });
   }
 
-  const target = await prisma.user.findUnique({ where: { id: otherUserId }, select: { isGhost: true } });
-  if (!target || target.isGhost) {
+  // Bloqueia os dois sentidos: ninguém pode chamar o Ghost pra conversar,
+  // e o Ghost (logado normalmente, usando o "+ Conversa" comum) também não
+  // pode iniciar uma conversa de verdade com ninguém - ele só age pelo
+  // painel /ghost.
+  const [target, requester] = await Promise.all([
+    prisma.user.findUnique({ where: { id: otherUserId }, select: { isGhost: true } }),
+    prisma.user.findUnique({ where: { id: userId }, select: { isGhost: true } }),
+  ]);
+  if (!target || target.isGhost || requester?.isGhost) {
     return NextResponse.json({ error: GHOST_TARGET_ERROR }, { status: 400 });
   }
 

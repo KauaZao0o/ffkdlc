@@ -10,13 +10,15 @@ const COLOR_MAP = {
   green: { bg: "#dff5df", fg: "#2f7a2f" },
 };
 
-export default function Avatar({ username, avatarColor = "blue", avatarUrl, size = 38 }) {
+export default function Avatar({ username, avatarColor = "blue", avatarUrl, size = 38, isOnline = false }) {
   const [imageFailed, setImageFailed] = useState(false);
 
   useEffect(() => setImageFailed(false), [avatarUrl]);
 
-  if (avatarUrl && !imageFailed) {
-    return (
+  const dotSize = Math.max(10, Math.round(size * 0.3));
+
+  const image =
+    avatarUrl && !imageFailed ? (
       <img
         src={avatarUrl}
         alt={username || "avatar"}
@@ -30,36 +32,55 @@ export default function Avatar({ username, avatarColor = "blue", avatarUrl, size
           minWidth: size,
           minHeight: size,
           display: "block",
-          flexShrink: 0,
         }}
         onError={() => setImageFailed(true)}
       />
+    ) : (
+      (() => {
+        const colors = COLOR_MAP[avatarColor] || COLOR_MAP.blue;
+        const initials = username ? username.slice(0, 2).toUpperCase() : "??";
+        return (
+          <div
+            style={{
+              width: size,
+              height: size,
+              borderRadius: "50%",
+              background: colors.bg,
+              color: colors.fg,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: Math.round(size * 0.34),
+              fontWeight: 500,
+              aspectRatio: "1 / 1",
+              minWidth: size,
+              minHeight: size,
+            }}
+          >
+            {initials}
+          </div>
+        );
+      })()
     );
-  }
-
-  const colors = COLOR_MAP[avatarColor] || COLOR_MAP.blue;
-  const initials = username ? username.slice(0, 2).toUpperCase() : "??";
 
   return (
-    <div
-      style={{
-        width: size,
-        height: size,
-        borderRadius: "50%",
-        background: colors.bg,
-        color: colors.fg,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        fontSize: Math.round(size * 0.34),
-        fontWeight: 500,
-        aspectRatio: "1 / 1",
-        minWidth: size,
-        minHeight: size,
-        flexShrink: 0,
-      }}
-    >
-      {initials}
-    </div>
+    <span style={{ position: "relative", display: "inline-flex", flexShrink: 0 }}>
+      {image}
+      {isOnline && (
+        <span
+          title="Online"
+          style={{
+            position: "absolute",
+            bottom: 0,
+            right: 0,
+            width: dotSize,
+            height: dotSize,
+            borderRadius: "50%",
+            background: "var(--success)",
+            border: "2px solid var(--surface)",
+          }}
+        />
+      )}
+    </span>
   );
 }

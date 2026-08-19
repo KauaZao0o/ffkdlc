@@ -8,6 +8,7 @@ import MessageInput from "./MessageInput.jsx";
 import CallAudioSettingsModal from "./CallAudioSettingsModal.jsx";
 import { useCall } from "@/context/CallContext.jsx";
 import { useProfileView } from "@/context/ProfileViewContext.jsx";
+import { usePresence } from "@/context/PresenceContext.jsx";
 import Avatar from "@/components/common/Avatar.jsx";
 
 const NEAR_BOTTOM_THRESHOLD = 100;
@@ -23,6 +24,7 @@ export default function ChatWindow({ conversation, onHideConversation, onBack, o
   const { user } = useAuth();
   const call = useCall();
   const { openProfile } = useProfileView();
+  const { onlineMap } = usePresence();
   const bottomRef = useRef(null);
   const scrollContainerRef = useRef(null);
   const channelRef = useRef(null);
@@ -75,9 +77,9 @@ export default function ChatWindow({ conversation, onHideConversation, onBack, o
 
       const map = {};
       participants.forEach((p) => {
-        map[p.id] = { username: p.username, avatarColor: p.avatarColor, avatarUrl: p.avatarUrl };
+        map[p.id] = { id: p.id, username: p.username, avatarColor: p.avatarColor, avatarUrl: p.avatarUrl };
       });
-      map[user.id] = { username: user.username, avatarColor: user.avatarColor, avatarUrl: user.avatarUrl };
+      map[user.id] = { id: user.id, username: user.username, avatarColor: user.avatarColor, avatarUrl: user.avatarUrl };
       participantsMapRef.current = map;
 
       setIsAdmin(!!participants.find((p) => p.id === user.id)?.isAdmin);
@@ -274,7 +276,13 @@ export default function ChatWindow({ conversation, onHideConversation, onBack, o
               title={`Ver perfil de ${conversation.name}`}
               style={{ border: "none", background: "transparent", padding: 0, cursor: "pointer", flexShrink: 0 }}
             >
-              <Avatar username={conversation.name} avatarColor={conversation.avatarColor} avatarUrl={conversation.avatarUrl} size={32} />
+              <Avatar
+                username={conversation.name}
+                avatarColor={conversation.avatarColor}
+                avatarUrl={conversation.avatarUrl}
+                size={32}
+                isOnline={!!onlineMap[conversation.participants?.[0]?.id]}
+              />
             </button>
           )}
           <p

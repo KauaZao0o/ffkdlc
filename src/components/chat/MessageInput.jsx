@@ -13,6 +13,26 @@ function formatDuration(totalSeconds) {
   return `${m}:${s}`;
 }
 
+// mp4/aac toca em qualquer navegador (Chrome, Firefox, Safari, iOS,
+// Android) - tenta gravar nesse formato primeiro. O Safari nunca sabe
+// gravar em webm, então nesses navegadores isso já cai direto pro mp4;
+// nos outros, só usa webm se mp4 não estiver disponível pra gravação.
+const AUDIO_MIME_CANDIDATES = ["audio/mp4", "audio/webm;codecs=opus", "audio/webm", "audio/ogg;codecs=opus"];
+
+function pickAudioMimeType() {
+  if (typeof MediaRecorder === "undefined" || !MediaRecorder.isTypeSupported) return undefined;
+  return AUDIO_MIME_CANDIDATES.find((type) => MediaRecorder.isTypeSupported(type));
+}
+
+// A extensão do arquivo precisa bater com o mimeType real gravado - o
+// Safari recusa tocar um áudio cuja extensão da URL não condiz com o
+// conteúdo real, mesmo com o Content-Type certo no servidor.
+function extensionForMimeType(mimeType) {
+  if (mimeType?.includes("mp4")) return "m4a";
+  if (mimeType?.includes("ogg")) return "ogg";
+  return "webm";
+}
+
 // Encontra o "@algumacoisa" que está sendo digitado bem antes do cursor,
 // se houver - usado pra abrir a lista de menção.
 function findActiveMention(value, cursorPos) {
@@ -236,7 +256,8 @@ export default function MessageInput({ channelRef, userId, conversationId, parti
   async function startRecording() {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const recorder = new MediaRecorder(stream);
+      const mimeType = pickAudioMimeType();
+      const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
       mediaRecorderRef.current = recorder;
       audioChunksRef.current = [];
 
@@ -264,7 +285,8 @@ export default function MessageInput({ channelRef, userId, conversationId, parti
 
         const blob = new Blob(audioChunksRef.current, { type: recorder.mimeType || "audio/webm" });
         if (blob.size > 0) {
-          const file = new File([blob], `audio-${Date.now()}.webm`, { type: blob.type });
+          const ext = extensionForMimeType(blob.type);
+          const file = new File([blob], `audio-${Date.now()}.${ext}`, { type: blob.type });
           await sendFile(file, MAX_FILE_SIZE, recordingSecondsRef.current);
         }
       };

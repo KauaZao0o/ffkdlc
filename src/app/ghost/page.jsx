@@ -140,7 +140,9 @@ function GhostPanel() {
     }
   }
 
-  const privateConversations = conversations.filter((c) => !c.isGroup);
+  // Conversas privadas sem nenhuma mensagem são só ruído aqui (ex: alguém
+  // que abriu o "+ Conversa" e nunca mandou nada) - não vale a pena listar.
+  const privateConversations = conversations.filter((c) => !c.isGroup && c.messageCount > 0);
   const groupConversations = conversations.filter((c) => c.isGroup);
 
   async function deleteUser(id, username) {
