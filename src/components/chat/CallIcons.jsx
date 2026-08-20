@@ -15,6 +15,15 @@ export function MinimizeIcon() {
   );
 }
 
+export function CameraIcon() {
+  return (
+    <svg className="call-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="6" width="13" height="12" rx="2" />
+      <path d="m16 10 5-3v10l-5-3" />
+    </svg>
+  );
+}
+
 export function ExpandIcon() {
   return (
     <svg className="call-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

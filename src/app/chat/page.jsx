@@ -110,7 +110,7 @@ function MoreMenu({ isGhost, onOpenGhostPanel }) {
             borderRadius: 10,
             boxShadow: "0 4px 12px rgba(0,0,0,0.25)",
             overflow: "hidden",
-            zIndex: 40,
+            zIndex: 70,
           }}
         >
           {isGhost && (

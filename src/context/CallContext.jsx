@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabaseClient";
-import { buildAudioConstraints, getPreferredSpeaker } from "@/lib/callDevices";
+import { buildAudioConstraints, buildVideoConstraints, getPreferredSpeaker } from "@/lib/callDevices";
 import { startRingtone, playChime } from "@/lib/sound";
 import { useSound } from "@/context/SoundContext.jsx";
 
@@ -69,9 +69,14 @@ export function CallProvider({ user, conversations, children }) {
   const [isMuted, setIsMuted] = useState(false);
   const [duration, setDuration] = useState(0);
   const [statusMessage, setStatusMessage] = useState("");
-  const [isScreenSharing, setIsScreenSharing] = useState(false);
-  const [localScreenStream, setLocalScreenStream] = useState(null);
-  const [remoteScreenStream, setRemoteScreenStream] = useState(null);
+  // O vídeo (tela compartilhada OU câmera) usa uma única faixa de vídeo por
+  // vez na mesma conexão - ligar a câmera desliga o compartilhamento de
+  // tela (e vice-versa). "kind" indica qual das duas coisas está passando
+  // no vídeo, pra rotular certo na tela ("compartilhando" vs "câmera").
+  const [localVideoKind, setLocalVideoKind] = useState(null); // null | "screen" | "camera"
+  const [remoteVideoKind, setRemoteVideoKind] = useState(null);
+  const [localVideoStream, setLocalVideoStream] = useState(null);
+  const [remoteVideoStream, setRemoteVideoStream] = useState(null);
 
   const { enabled: soundEnabled } = useSound();
 
@@ -91,7 +96,8 @@ export function CallProvider({ user, conversations, children }) {
   const ringTimeoutRef = useRef(null);
   const disconnectGraceRef = useRef(null);
   const stopRingtoneRef = useRef(null);
-  const screenStreamRef = useRef(null);
+  const videoStreamRef = useRef(null);
+  const videoKindRef = useRef(null);
 
   // Refs "espelhando" o estado mais recente - os handlers dos canais são
   // criados uma vez (só quando a lista de conversas muda) e não podem
@@ -110,6 +116,9 @@ export function CallProvider({ user, conversations, children }) {
   useEffect(() => {
     userRef.current = user;
   }, [user]);
+  useEffect(() => {
+    videoKindRef.current = localVideoKind;
+  }, [localVideoKind]);
 
   // ---------- Chamada em GRUPO (mesh WebRTC - todo mundo conecta com todo
   // mundo diretamente, sem servidor central de mídia) ----------
@@ -127,9 +136,10 @@ export function CallProvider({ user, conversations, children }) {
   const [groupCallPeers, setGroupCallPeers] = useState([]); // [{id, username, avatarColor, avatarUrl, connected}]
   const [groupIsMuted, setGroupIsMuted] = useState(false);
   const [groupDuration, setGroupDuration] = useState(0);
-  const [groupIsScreenSharing, setGroupIsScreenSharing] = useState(false);
-  const [groupLocalScreenStream, setGroupLocalScreenStream] = useState(null);
-  const [groupRemoteScreens, setGroupRemoteScreens] = useState({});
+  const [groupLocalVideoKind, setGroupLocalVideoKind] = useState(null); // null | "screen" | "camera"
+  const [groupLocalVideoStream, setGroupLocalVideoStream] = useState(null);
+  const [groupRemoteVideos, setGroupRemoteVideos] = useState({}); // peerId -> MediaStream
+  const [groupRemoteVideoKinds, setGroupRemoteVideoKinds] = useState({}); // peerId -> "screen" | "camera"
   // {[conversationId]: {count, names, conversationName}} - permite mostrar um
   // aviso de "chamada em andamento" em QUALQUER grupo, mesmo um que a pessoa
   // não entrou (e nem estava olhando quando a chamada começou).
@@ -144,7 +154,12 @@ export function CallProvider({ user, conversations, children }) {
   const groupDurationIntervalRef = useRef(null);
   const groupCallStateRef = useRef("idle");
   const groupIsMutedRef = useRef(false);
-  const groupScreenStreamRef = useRef(null);
+  const groupVideoStreamRef = useRef(null);
+  const groupVideoKindRef = useRef(null);
+
+  useEffect(() => {
+    groupVideoKindRef.current = groupLocalVideoKind;
+  }, [groupLocalVideoKind]);
 
   function stopRingtone() {
     stopRingtoneRef.current?.();
@@ -180,11 +195,13 @@ export function CallProvider({ user, conversations, children }) {
     pcRef.current = null;
     localStreamRef.current?.getTracks().forEach((t) => t.stop());
     localStreamRef.current = null;
-    screenStreamRef.current?.getTracks().forEach((t) => t.stop());
-    screenStreamRef.current = null;
-    setIsScreenSharing(false);
-    setLocalScreenStream(null);
-    setRemoteScreenStream(null);
+    videoStreamRef.current?.getTracks().forEach((t) => t.stop());
+    videoStreamRef.current = null;
+    videoKindRef.current = null;
+    setLocalVideoKind(null);
+    setLocalVideoStream(null);
+    setRemoteVideoKind(null);
+    setRemoteVideoStream(null);
     if (remoteAudioRef.current) remoteAudioRef.current.srcObject = null;
     remoteDescSetRef.current = false;
     pendingCandidatesRef.current = [];
@@ -242,12 +259,19 @@ export function CallProvider({ user, conversations, children }) {
     pc.ontrack = (e) => {
       if (e.track.kind === "video") {
         const stream = e.streams[0] || new MediaStream([e.track]);
-        setGroupRemoteScreens((prev) => ({ ...prev, [peerId]: stream }));
-        e.track.onended = () => setGroupRemoteScreens((prev) => {
-          const next = { ...prev };
-          delete next[peerId];
-          return next;
-        });
+        setGroupRemoteVideos((prev) => ({ ...prev, [peerId]: stream }));
+        e.track.onended = () => {
+          setGroupRemoteVideos((prev) => {
+            const next = { ...prev };
+            delete next[peerId];
+            return next;
+          });
+          setGroupRemoteVideoKinds((prev) => {
+            const next = { ...prev };
+            delete next[peerId];
+            return next;
+          });
+        };
         return;
       }
       let audioEl = groupAudioElsRef.current.get(peerId);
@@ -309,6 +333,16 @@ export function CallProvider({ user, conversations, children }) {
     groupDisconnectTimersRef.current.delete(peerId);
 
     setGroupCallPeers((prev) => prev.filter((p) => p.id !== peerId));
+    setGroupRemoteVideos((prev) => {
+      const next = { ...prev };
+      delete next[peerId];
+      return next;
+    });
+    setGroupRemoteVideoKinds((prev) => {
+      const next = { ...prev };
+      delete next[peerId];
+      return next;
+    });
   }
 
   // Cria a conexão com um novo participante e manda uma oferta pra ele -
@@ -321,7 +355,7 @@ export function CallProvider({ user, conversations, children }) {
     const pc = createGroupPeerConnection(convId, peerId);
     groupPcsRef.current.set(peerId, pc);
     groupLocalStreamRef.current.getTracks().forEach((t) => pc.addTrack(t, groupLocalStreamRef.current));
-    groupScreenStreamRef.current?.getVideoTracks().forEach((t) => pc.addTrack(t, groupScreenStreamRef.current));
+    groupVideoStreamRef.current?.getVideoTracks().forEach((t) => pc.addTrack(t, groupVideoStreamRef.current));
     await boostAudioBitrate(pc);
 
     setGroupCallPeers((prev) =>
@@ -343,6 +377,7 @@ export function CallProvider({ user, conversations, children }) {
       username: userRef.current.username,
       avatarColor: userRef.current.avatarColor,
       avatarUrl: userRef.current.avatarUrl,
+      videoKind: groupVideoKindRef.current,
     });
   }
 
@@ -360,8 +395,9 @@ export function CallProvider({ user, conversations, children }) {
     groupPendingCandidatesRef.current.clear();
     groupLocalStreamRef.current?.getTracks().forEach((t) => t.stop());
     groupLocalStreamRef.current = null;
-    groupScreenStreamRef.current?.getTracks().forEach((t) => t.stop());
-    groupScreenStreamRef.current = null;
+    groupVideoStreamRef.current?.getTracks().forEach((t) => t.stop());
+    groupVideoStreamRef.current = null;
+    groupVideoKindRef.current = null;
 
     groupCallStateRef.current = "idle";
     groupIsMutedRef.current = false;
@@ -372,9 +408,10 @@ export function CallProvider({ user, conversations, children }) {
     setGroupCallPeers([]);
     setGroupIsMuted(false);
     setGroupDuration(0);
-    setGroupIsScreenSharing(false);
-    setGroupLocalScreenStream(null);
-    setGroupRemoteScreens({});
+    setGroupLocalVideoKind(null);
+    setGroupLocalVideoStream(null);
+    setGroupRemoteVideos({});
+    setGroupRemoteVideoKinds({});
   }
 
   function createPeerConnection(convId) {
@@ -389,8 +426,11 @@ export function CallProvider({ user, conversations, children }) {
     pc.ontrack = (e) => {
       if (e.track.kind === "video") {
         const stream = e.streams[0] || new MediaStream([e.track]);
-        setRemoteScreenStream(stream);
-        e.track.onended = () => setRemoteScreenStream(null);
+        setRemoteVideoStream(stream);
+        e.track.onended = () => {
+          setRemoteVideoStream(null);
+          setRemoteVideoKind(null);
+        };
         return;
       }
       if (remoteAudioRef.current) {
@@ -589,21 +629,22 @@ export function CallProvider({ user, conversations, children }) {
     setIsMuted(nextMuted);
   }, []);
 
-  // A tela é uma faixa de vídeo adicional na mesma conexão WebRTC. Sempre
-  // renegociamos após adicioná-la/removê-la, para que a outra pessoa receba a
-  // alteração sem precisar sair da ligação.
-  const renegotiatePrivateCall = useCallback(async () => {
+  // O vídeo (tela compartilhada OU câmera) é uma faixa adicional na mesma
+  // conexão WebRTC. Sempre renegociamos após adicioná-la/removê-la, para
+  // que a outra pessoa receba a alteração sem precisar sair da ligação.
+  const renegotiatePrivateCall = useCallback(async (videoKind) => {
     const pc = pcRef.current;
     if (!pc || !conversationIdRef.current) return;
     const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
-    send(conversationIdRef.current, "call-screen-offer", { to: peerIdRef.current, callId: callIdRef.current, sdp: offer });
+    send(conversationIdRef.current, "call-screen-offer", { to: peerIdRef.current, callId: callIdRef.current, sdp: offer, videoKind });
   }, []);
 
-  const stopScreenShare = useCallback(async () => {
-    const stream = screenStreamRef.current;
+  const stopVideoShare = useCallback(async () => {
+    const stream = videoStreamRef.current;
     if (!stream) return;
-    screenStreamRef.current = null;
+    videoStreamRef.current = null;
+    videoKindRef.current = null;
     const sender = pcRef.current?.getSenders().find((s) => s.track?.kind === "video");
     if (sender) {
       try {
@@ -615,36 +656,53 @@ export function CallProvider({ user, conversations, children }) {
       pcRef.current?.removeTrack(sender);
     }
     stream.getTracks().forEach((track) => track.stop());
-    setIsScreenSharing(false);
-    setLocalScreenStream(null);
+    setLocalVideoKind(null);
+    setLocalVideoStream(null);
     send(conversationIdRef.current, "call-screen-stop", { to: peerIdRef.current, callId: callIdRef.current });
     try {
-      await renegotiatePrivateCall();
+      await renegotiatePrivateCall(null);
     } catch (err) {
-      console.error("Não foi possível atualizar o compartilhamento de tela:", err);
+      console.error("Não foi possível atualizar o vídeo:", err);
     }
   }, [renegotiatePrivateCall]);
 
-  const toggleScreenShare = useCallback(async () => {
-    if (screenStreamRef.current) return stopScreenShare();
-    if (!supportsScreenShare()) {
+  // Inicia o envio de vídeo (tela ou câmera) - só uma faixa de vídeo por
+  // vez: trocar de tipo (ex: estava com a câmera e clicou em compartilhar
+  // tela) para o anterior automaticamente antes de começar o novo.
+  const startVideoShare = useCallback(async (videoKind) => {
+    if (videoStreamRef.current) await stopVideoShare();
+    if (videoKind === "screen" && !supportsScreenShare()) {
       alert(getScreenShareUnavailableMessage());
       return;
     }
     try {
-      const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
+      const stream =
+        videoKind === "screen"
+          ? await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false })
+          : await navigator.mediaDevices.getUserMedia({ video: buildVideoConstraints() });
       const track = stream.getVideoTracks()[0];
       if (!track) return;
-      screenStreamRef.current = stream;
-      track.onended = () => stopScreenShare();
+      videoStreamRef.current = stream;
+      videoKindRef.current = videoKind;
+      track.onended = () => stopVideoShare();
       pcRef.current?.addTrack(track, stream);
-      setLocalScreenStream(stream);
-      setIsScreenSharing(true);
-      await renegotiatePrivateCall();
+      setLocalVideoStream(stream);
+      setLocalVideoKind(videoKind);
+      await renegotiatePrivateCall(videoKind);
     } catch (err) {
-      if (err?.name !== "NotAllowedError") console.error("Não foi possível compartilhar a tela:", err);
+      if (err?.name !== "NotAllowedError") console.error("Não foi possível iniciar o vídeo:", err);
     }
-  }, [renegotiatePrivateCall, stopScreenShare]);
+  }, [renegotiatePrivateCall, stopVideoShare]);
+
+  const toggleScreenShare = useCallback(() => {
+    if (videoKindRef.current === "screen") return stopVideoShare();
+    return startVideoShare("screen");
+  }, [startVideoShare, stopVideoShare]);
+
+  const toggleCamera = useCallback(() => {
+    if (videoKindRef.current === "camera") return stopVideoShare();
+    return startVideoShare("camera");
+  }, [startVideoShare, stopVideoShare]);
 
   // Entra na "sala" de chamada em grupo de uma conversa - seja começando
   // ela do zero (ninguém mais lá ainda) ou entrando numa que já está
@@ -713,20 +771,21 @@ export function CallProvider({ user, conversations, children }) {
     setGroupIsMuted(nextMuted);
   }, []);
 
-  const renegotiateGroupScreen = useCallback(async () => {
+  const renegotiateGroupScreen = useCallback(async (videoKind) => {
     const convId = groupConversationIdRef.current;
     if (!convId) return;
     for (const [peerId, pc] of groupPcsRef.current) {
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
-      send(convId, "group-call-signal", { to: peerId, kind: "screen-offer", sdp: offer });
+      send(convId, "group-call-signal", { to: peerId, kind: "screen-offer", sdp: offer, videoKind });
     }
   }, []);
 
-  const stopGroupScreenShare = useCallback(async () => {
-    const stream = groupScreenStreamRef.current;
+  const stopGroupVideoShare = useCallback(async () => {
+    const stream = groupVideoStreamRef.current;
     if (!stream) return;
-    groupScreenStreamRef.current = null;
+    groupVideoStreamRef.current = null;
+    groupVideoKindRef.current = null;
     for (const [peerId, pc] of groupPcsRef.current) {
       const sender = pc.getSenders().find((s) => s.track?.kind === "video");
       if (sender) {
@@ -740,35 +799,51 @@ export function CallProvider({ user, conversations, children }) {
       send(groupConversationIdRef.current, "group-call-signal", { to: peerId, kind: "screen-stop" });
     }
     stream.getTracks().forEach((track) => track.stop());
-    setGroupIsScreenSharing(false);
-    setGroupLocalScreenStream(null);
+    setGroupLocalVideoKind(null);
+    setGroupLocalVideoStream(null);
     try {
-      await renegotiateGroupScreen();
+      await renegotiateGroupScreen(null);
     } catch (err) {
-      console.error("Não foi possível atualizar o compartilhamento de tela:", err);
+      console.error("Não foi possível atualizar o vídeo:", err);
     }
   }, [renegotiateGroupScreen]);
 
-  const toggleGroupScreenShare = useCallback(async () => {
-    if (groupScreenStreamRef.current) return stopGroupScreenShare();
-    if (!supportsScreenShare()) {
+  // Inicia o envio de vídeo (tela ou câmera) pra TODOS os participantes da
+  // chamada em grupo de uma vez - mesma regra da 1-a-1: só um vídeo por vez.
+  const startGroupVideoShare = useCallback(async (videoKind) => {
+    if (groupVideoStreamRef.current) await stopGroupVideoShare();
+    if (videoKind === "screen" && !supportsScreenShare()) {
       alert(getScreenShareUnavailableMessage());
       return;
     }
     try {
-      const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
+      const stream =
+        videoKind === "screen"
+          ? await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false })
+          : await navigator.mediaDevices.getUserMedia({ video: buildVideoConstraints() });
       const track = stream.getVideoTracks()[0];
       if (!track) return;
-      groupScreenStreamRef.current = stream;
-      track.onended = () => stopGroupScreenShare();
+      groupVideoStreamRef.current = stream;
+      groupVideoKindRef.current = videoKind;
+      track.onended = () => stopGroupVideoShare();
       for (const pc of groupPcsRef.current.values()) pc.addTrack(track, stream);
-      setGroupLocalScreenStream(stream);
-      setGroupIsScreenSharing(true);
-      await renegotiateGroupScreen();
+      setGroupLocalVideoStream(stream);
+      setGroupLocalVideoKind(videoKind);
+      await renegotiateGroupScreen(videoKind);
     } catch (err) {
-      if (err?.name !== "NotAllowedError") console.error("Não foi possível compartilhar a tela:", err);
+      if (err?.name !== "NotAllowedError") console.error("Não foi possível iniciar o vídeo:", err);
     }
-  }, [renegotiateGroupScreen, stopGroupScreenShare]);
+  }, [renegotiateGroupScreen, stopGroupVideoShare]);
+
+  const toggleGroupScreenShare = useCallback(() => {
+    if (groupVideoKindRef.current === "screen") return stopGroupVideoShare();
+    return startGroupVideoShare("screen");
+  }, [startGroupVideoShare, stopGroupVideoShare]);
+
+  const toggleGroupCamera = useCallback(() => {
+    if (groupVideoKindRef.current === "camera") return stopGroupVideoShare();
+    return startGroupVideoShare("camera");
+  }, [startGroupVideoShare, stopGroupVideoShare]);
 
   // Troca o microfone em uso em TODAS as conexões da chamada em grupo de
   // uma vez (uma faixa de áudio por peer, já que cada um tem sua própria
@@ -886,6 +961,7 @@ export function CallProvider({ user, conversations, children }) {
           await pc.setRemoteDescription(payload.sdp);
           const answer = await pc.createAnswer();
           await pc.setLocalDescription(answer);
+          setRemoteVideoKind(payload.videoKind || null);
           send(id, "call-screen-answer", { to: payload.from, callId: payload.callId, sdp: answer });
         })
         .on("broadcast", { event: "call-screen-answer" }, async ({ payload }) => {
@@ -894,7 +970,8 @@ export function CallProvider({ user, conversations, children }) {
         })
         .on("broadcast", { event: "call-screen-stop" }, ({ payload }) => {
           if (payload.from === user.id || payload.callId !== callIdRef.current) return;
-          setRemoteScreenStream(null);
+          setRemoteVideoStream(null);
+          setRemoteVideoKind(null);
         })
         .on("broadcast", { event: "call-ice" }, async ({ payload }) => {
           if (payload.from === user.id || payload.callId !== callIdRef.current) return;
@@ -937,7 +1014,7 @@ export function CallProvider({ user, conversations, children }) {
               pc = createGroupPeerConnection(id, payload.from);
               groupPcsRef.current.set(payload.from, pc);
               groupLocalStreamRef.current?.getTracks().forEach((t) => pc.addTrack(t, groupLocalStreamRef.current));
-              groupScreenStreamRef.current?.getVideoTracks().forEach((t) => pc.addTrack(t, groupScreenStreamRef.current));
+              groupVideoStreamRef.current?.getVideoTracks().forEach((t) => pc.addTrack(t, groupVideoStreamRef.current));
               await boostAudioBitrate(pc);
             }
             await pc.setRemoteDescription(payload.sdp);
@@ -952,12 +1029,18 @@ export function CallProvider({ user, conversations, children }) {
                 avatarUrl: payload.avatarUrl,
               })
             );
-            send(id, "group-call-signal", { to: payload.from, kind: "answer", sdp: answer });
+            if (payload.videoKind) {
+              setGroupRemoteVideoKinds((prev) => ({ ...prev, [payload.from]: payload.videoKind }));
+            }
+            send(id, "group-call-signal", { to: payload.from, kind: "answer", sdp: answer, videoKind: groupVideoKindRef.current });
           } else if (payload.kind === "answer") {
             const pc = groupPcsRef.current.get(payload.from);
             if (pc) {
               await pc.setRemoteDescription(payload.sdp);
               await flushGroupPendingCandidates(payload.from);
+            }
+            if (payload.videoKind) {
+              setGroupRemoteVideoKinds((prev) => ({ ...prev, [payload.from]: payload.videoKind }));
             }
           } else if (payload.kind === "screen-offer") {
             const pc = groupPcsRef.current.get(payload.from);
@@ -965,12 +1048,23 @@ export function CallProvider({ user, conversations, children }) {
             await pc.setRemoteDescription(payload.sdp);
             const answer = await pc.createAnswer();
             await pc.setLocalDescription(answer);
+            setGroupRemoteVideoKinds((prev) => {
+              const next = { ...prev };
+              if (payload.videoKind) next[payload.from] = payload.videoKind;
+              else delete next[payload.from];
+              return next;
+            });
             send(id, "group-call-signal", { to: payload.from, kind: "screen-answer", sdp: answer });
           } else if (payload.kind === "screen-answer") {
             const pc = groupPcsRef.current.get(payload.from);
             if (pc) await pc.setRemoteDescription(payload.sdp);
           } else if (payload.kind === "screen-stop") {
-            setGroupRemoteScreens((prev) => {
+            setGroupRemoteVideos((prev) => {
+              const next = { ...prev };
+              delete next[payload.from];
+              return next;
+            });
+            setGroupRemoteVideoKinds((prev) => {
               const next = { ...prev };
               delete next[payload.from];
               return next;
@@ -1069,15 +1163,17 @@ export function CallProvider({ user, conversations, children }) {
     isMuted,
     duration,
     statusMessage,
-    isScreenSharing,
-    localScreenStream,
-    remoteScreenStream,
+    localVideoKind,
+    remoteVideoKind,
+    localVideoStream,
+    remoteVideoStream,
     startCall,
     acceptCall,
     rejectCall,
     endCall,
     toggleMute,
     toggleScreenShare,
+    toggleCamera,
     switchMicrophone,
     switchSpeaker,
 
@@ -1086,14 +1182,16 @@ export function CallProvider({ user, conversations, children }) {
     groupCallPeers,
     groupIsMuted,
     groupDuration,
-    groupIsScreenSharing,
-    groupLocalScreenStream,
-    groupRemoteScreens,
+    groupLocalVideoKind,
+    groupLocalVideoStream,
+    groupRemoteVideos,
+    groupRemoteVideoKinds,
     groupCallBanners,
     joinGroupCall,
     leaveGroupCall,
     toggleGroupMute,
     toggleGroupScreenShare,
+    toggleGroupCamera,
     switchGroupMicrophone,
     switchGroupSpeaker,
   };

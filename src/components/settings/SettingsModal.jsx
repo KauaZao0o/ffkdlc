@@ -1,13 +1,15 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext.jsx";
 import { useTheme } from "@/context/ThemeContext.jsx";
 import { uploadChatFile } from "@/lib/uploadImage";
 import Avatar from "@/components/common/Avatar.jsx";
 
 export default function SettingsModal({ onClose }) {
-  const { user, updateUser } = useAuth();
+  const router = useRouter();
+  const { user, updateUser, logout } = useAuth();
   const { isDark, toggle: toggleTheme } = useTheme();
 
   const [username, setUsername] = useState(user.username);
@@ -23,6 +25,11 @@ export default function SettingsModal({ onClose }) {
   const [savingPassword, setSavingPassword] = useState(false);
   const [passwordError, setPasswordError] = useState("");
   const [passwordSuccess, setPasswordSuccess] = useState("");
+
+  const [showDeleteAccount, setShowDeleteAccount] = useState(false);
+  const [deletePassword, setDeletePassword] = useState("");
+  const [deletingAccount, setDeletingAccount] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
 
   async function handleAvatarChange(e) {
     const file = e.target.files?.[0];
@@ -112,6 +119,36 @@ export default function SettingsModal({ onClose }) {
     }
   }
 
+  async function handleDeleteAccount(e) {
+    e.preventDefault();
+    setDeleteError("");
+
+    if (!confirm("Tem certeza que quer apagar sua conta? Todas as suas conversas e mensagens serão perdidas para sempre. Essa ação não pode ser desfeita.")) {
+      return;
+    }
+
+    setDeletingAccount(true);
+    try {
+      const res = await fetch("/api/auth/me", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ password: deletePassword }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        setDeleteError(data?.error || "Não foi possível apagar a conta.");
+        return;
+      }
+
+      await logout();
+      router.replace("/login");
+    } finally {
+      setDeletingAccount(false);
+    }
+  }
+
   return (
     <div className="drawer-overlay" onClick={onClose}>
       <div className="drawer-panel" onClick={(e) => e.stopPropagation()} style={{ width: 340 }}>
@@ -192,6 +229,54 @@ export default function SettingsModal({ onClose }) {
             {savingPassword ? "Salvando..." : "Trocar senha"}
           </button>
         </form>
+
+        {!user.isGhost && (
+        <div style={{ marginTop: 28, paddingTop: 20, borderTop: "1px solid var(--border)" }}>
+          <p style={{ margin: "0 0 12px", fontSize: 13, fontWeight: 500, color: "var(--danger)" }}>Zona de perigo</p>
+
+          {!showDeleteAccount ? (
+            <button type="button" onClick={() => setShowDeleteAccount(true)} style={{ color: "var(--danger)" }}>
+              Apagar minha conta
+            </button>
+          ) : (
+            <form onSubmit={handleDeleteAccount} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <p style={{ margin: 0, fontSize: 13, color: "var(--text-muted)" }}>
+                Isso apaga sua conta, conversas e mensagens para sempre. Digite sua senha para confirmar.
+              </p>
+              <input
+                type="password"
+                placeholder="Sua senha"
+                value={deletePassword}
+                onChange={(e) => setDeletePassword(e.target.value)}
+                autoFocus
+              />
+
+              {deleteError && <p style={{ color: "var(--danger)", fontSize: 13, margin: 0 }}>{deleteError}</p>}
+
+              <div style={{ display: "flex", gap: 8 }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowDeleteAccount(false);
+                    setDeletePassword("");
+                    setDeleteError("");
+                  }}
+                  style={{ flex: 1 }}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={deletingAccount || !deletePassword}
+                  style={{ flex: 1, background: "var(--danger)", color: "white", borderColor: "var(--danger)" }}
+                >
+                  {deletingAccount ? "Apagando..." : "Apagar conta"}
+                </button>
+              </div>
+            </form>
+          )}
+        </div>
+        )}
       </div>
     </div>
   );

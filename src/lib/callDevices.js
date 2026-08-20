@@ -55,3 +55,13 @@ export function buildAudioConstraints() {
     ...(deviceId ? { deviceId: { exact: deviceId } } : {}),
   };
 }
+
+// Constraints da câmera na chamada de vídeo - câmera frontal, resolução
+// moderada (suficiente pra chamada, sem pesar demais na rede).
+export function buildVideoConstraints() {
+  return {
+    facingMode: "user",
+    width: { ideal: 1280 },
+    height: { ideal: 720 },
+  };
+}

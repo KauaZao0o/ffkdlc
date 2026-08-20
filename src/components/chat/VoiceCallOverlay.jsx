@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import CallAudioSettingsModal from "./CallAudioSettingsModal.jsx";
 import ScreenShareVideo from "./ScreenShareVideo.jsx";
-import { MinimizeIcon, ScreenShareIcon } from "./CallIcons.jsx";
+import { MinimizeIcon, ScreenShareIcon, CameraIcon } from "./CallIcons.jsx";
 
 function formatCallDuration(totalSeconds) {
   const m = Math.floor(totalSeconds / 60).toString().padStart(2, "0");
@@ -24,18 +24,20 @@ export default function VoiceCallOverlay({ call }) {
     toggleMute,
     switchMicrophone,
     switchSpeaker,
-    isScreenSharing,
-    localScreenStream,
-    remoteScreenStream,
+    localVideoKind,
+    remoteVideoKind,
+    localVideoStream,
+    remoteVideoStream,
     toggleScreenShare,
+    toggleCamera,
   } = call;
   const [showAudioSettings, setShowAudioSettings] = useState(false);
   const [screensMinimized, setScreensMinimized] = useState(false);
-  const hasScreen = !!(localScreenStream || remoteScreenStream);
+  const hasVideo = !!(localVideoStream || remoteVideoStream);
 
   useEffect(() => {
-    if (hasScreen) setScreensMinimized(false);
-  }, [hasScreen, localScreenStream, remoteScreenStream]);
+    if (hasVideo) setScreensMinimized(false);
+  }, [hasVideo, localVideoStream, remoteVideoStream]);
 
   // A barra da chamada é fixa; reserva o espaço dela no app para não cobrir
   // os atalhos de nova conversa/grupo nem o topo da conversa aberta.
@@ -191,9 +193,9 @@ export default function VoiceCallOverlay({ call }) {
         <span className="call-live-dot" /> {peerName} <span>· {formatCallDuration(duration)}</span>
       </span>
       <div className="call-control-actions">
-        {hasScreen && (
-          <button type="button" className="call-control-button" onClick={() => setScreensMinimized((value) => !value)} title={screensMinimized ? "Mostrar compartilhamento" : "Voltar ao chat"}>
-            {screensMinimized ? <ScreenShareIcon /> : <MinimizeIcon />}
+        {hasVideo && (
+          <button type="button" className="call-control-button" onClick={() => setScreensMinimized((value) => !value)} title={screensMinimized ? "Mostrar vídeo" : "Voltar ao chat"}>
+            {screensMinimized ? (localVideoKind === "camera" || remoteVideoKind === "camera" ? <CameraIcon /> : <ScreenShareIcon />) : <MinimizeIcon />}
           </button>
         )}
         <button
@@ -236,9 +238,17 @@ export default function VoiceCallOverlay({ call }) {
         </button>
         <button
           type="button"
+          onClick={toggleCamera}
+          title={localVideoKind === "camera" ? "Desligar câmera" : "Ligar câmera"}
+          className={localVideoKind === "camera" ? "call-control-button active" : "call-control-button"}
+        >
+          <CameraIcon />
+        </button>
+        <button
+          type="button"
           onClick={toggleScreenShare}
-          title={isScreenSharing ? "Parar de compartilhar tela" : "Compartilhar tela"}
-          className={isScreenSharing ? "call-control-button active" : "call-control-button"}
+          title={localVideoKind === "screen" ? "Parar de compartilhar tela" : "Compartilhar tela"}
+          className={localVideoKind === "screen" ? "call-control-button active" : "call-control-button"}
         >
           <ScreenShareIcon />
         </button>
@@ -266,11 +276,19 @@ export default function VoiceCallOverlay({ call }) {
       </div>
       </div>
 
-      {hasScreen && !screensMinimized && (
-        <div className="screen-share-dock" aria-label="Telas compartilhadas">
+      {hasVideo && !screensMinimized && (
+        <div className="screen-share-dock" aria-label="Vídeo da chamada">
           <button type="button" className="screen-share-minimize" onClick={() => setScreensMinimized(true)} title="Voltar ao chat" aria-label="Voltar ao chat"><MinimizeIcon /></button>
-          <ScreenShareVideo stream={localScreenStream} label="Você está compartilhando" muted />
-          <ScreenShareVideo stream={remoteScreenStream} label={`${peerName} está compartilhando`} />
+          <ScreenShareVideo
+            stream={localVideoStream}
+            label={localVideoKind === "camera" ? "Você" : "Você está compartilhando"}
+            muted
+            mirrored={localVideoKind === "camera"}
+          />
+          <ScreenShareVideo
+            stream={remoteVideoStream}
+            label={remoteVideoKind === "camera" ? `${peerName} ligou a câmera` : remoteVideoKind === "screen" ? `${peerName} está compartilhando` : peerName}
+          />
         </div>
       )}
 
