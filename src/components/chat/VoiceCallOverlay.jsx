@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import CallAudioSettingsModal from "./CallAudioSettingsModal.jsx";
 import ScreenShareVideo from "./ScreenShareVideo.jsx";
 import { MinimizeIcon, ScreenShareIcon, CameraIcon } from "./CallIcons.jsx";
@@ -34,18 +34,31 @@ export default function VoiceCallOverlay({ call }) {
   const [showAudioSettings, setShowAudioSettings] = useState(false);
   const [screensMinimized, setScreensMinimized] = useState(false);
   const hasVideo = !!(localVideoStream || remoteVideoStream);
+  const barRef = useRef(null);
 
   useEffect(() => {
     if (hasVideo) setScreensMinimized(false);
   }, [hasVideo, localVideoStream, remoteVideoStream]);
 
-  // A barra da chamada é fixa; reserva o espaço dela no app para não cobrir
-  // os atalhos de nova conversa/grupo nem o topo da conversa aberta.
+  // A barra da chamada é fixa; reserva embaixo dela exatamente a altura
+  // real (medida, não fixa) - um valor fixo errado faz a barra sobrepor o
+  // topo da lista de conversas/conteúdo da conversa aberta.
   useEffect(() => {
-    if (callState !== "connected") return;
+    if (callState !== "connected" || !barRef.current) return;
     document.body.classList.add("call-active");
-    document.body.style.setProperty("--active-call-bar-height", "56px");
+
+    const updateHeight = () => {
+      if (barRef.current) {
+        document.body.style.setProperty("--active-call-bar-height", `${barRef.current.offsetHeight}px`);
+      }
+    };
+    updateHeight();
+
+    const observer = new ResizeObserver(updateHeight);
+    observer.observe(barRef.current);
+
     return () => {
+      observer.disconnect();
       document.body.classList.remove("call-active");
       document.body.style.removeProperty("--active-call-bar-height");
     };
@@ -179,6 +192,7 @@ export default function VoiceCallOverlay({ call }) {
   return (
     <>
       <div
+        ref={barRef}
         className="call-control-bar"
         style={{
           position: "fixed",
@@ -284,10 +298,12 @@ export default function VoiceCallOverlay({ call }) {
             label={localVideoKind === "camera" ? "Você" : "Você está compartilhando"}
             muted
             mirrored={localVideoKind === "camera"}
+            fill={localVideoKind === "camera"}
           />
           <ScreenShareVideo
             stream={remoteVideoStream}
             label={remoteVideoKind === "camera" ? `${peerName} ligou a câmera` : remoteVideoKind === "screen" ? `${peerName} está compartilhando` : peerName}
+            fill={remoteVideoKind === "camera"}
           />
         </div>
       )}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Avatar from "@/components/common/Avatar.jsx";
 import CallAudioSettingsModal from "./CallAudioSettingsModal.jsx";
 import ScreenShareVideo from "./ScreenShareVideo.jsx";
@@ -36,21 +36,37 @@ export default function GroupCallOverlay({ call }) {
   const [showAudioSettings, setShowAudioSettings] = useState(false);
   const [screensMinimized, setScreensMinimized] = useState(false);
   const hasVideo = !!(groupLocalVideoStream || Object.keys(groupRemoteVideos).length > 0);
+  const barRef = useRef(null);
 
   useEffect(() => {
     if (hasVideo) setScreensMinimized(false);
   }, [hasVideo, groupLocalVideoStream, groupRemoteVideos]);
 
-  // Em grupo a faixa de participantes pode ocupar uma segunda linha.
+  // Reserva embaixo da barra exatamente a altura real dela (medida, não
+  // "chutada") - a barra pode crescer em altura por vários motivos (fileira
+  // de participantes aparecendo, texto "conectando N..." quebrando linha em
+  // telas estreitas, etc) e um valor fixo errado faz a barra sobrepor o
+  // topo da lista de conversas.
   useEffect(() => {
-    if (groupCallState !== "active") return;
+    if (groupCallState !== "active" || !barRef.current) return;
     document.body.classList.add("call-active");
-    document.body.style.setProperty("--active-call-bar-height", groupCallPeers.length > 0 ? "104px" : "56px");
+
+    const updateHeight = () => {
+      if (barRef.current) {
+        document.body.style.setProperty("--active-call-bar-height", `${barRef.current.offsetHeight}px`);
+      }
+    };
+    updateHeight();
+
+    const observer = new ResizeObserver(updateHeight);
+    observer.observe(barRef.current);
+
     return () => {
+      observer.disconnect();
       document.body.classList.remove("call-active");
       document.body.style.removeProperty("--active-call-bar-height");
     };
-  }, [groupCallState, groupCallPeers.length]);
+  }, [groupCallState]);
 
   if (groupCallState !== "active") return null;
 
@@ -59,6 +75,7 @@ export default function GroupCallOverlay({ call }) {
   return (
     <>
       <div
+        ref={barRef}
         className="call-control-bar"
         style={{
           position: "fixed",
@@ -188,6 +205,7 @@ export default function GroupCallOverlay({ call }) {
               label={groupLocalVideoKind === "camera" ? "Você" : "Você está compartilhando"}
               muted
               mirrored={groupLocalVideoKind === "camera"}
+              fill={groupLocalVideoKind === "camera"}
             />
           )}
           {Object.entries(groupRemoteVideos).map(([peerId, stream]) => {
@@ -195,7 +213,7 @@ export default function GroupCallOverlay({ call }) {
             const kind = groupRemoteVideoKinds[peerId];
             const name = peer?.username || "Participante";
             const label = kind === "camera" ? `${name} ligou a câmera` : kind === "screen" ? `${name} está compartilhando` : name;
-            return <ScreenShareVideo key={peerId} stream={stream} label={label} />;
+            return <ScreenShareVideo key={peerId} stream={stream} label={label} fill={kind === "camera"} />;
           })}
         </div>
       )}

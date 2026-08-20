@@ -667,10 +667,14 @@ export function CallProvider({ user, conversations, children }) {
   }, [renegotiatePrivateCall]);
 
   // Inicia o envio de vídeo (tela ou câmera) - só uma faixa de vídeo por
-  // vez: trocar de tipo (ex: estava com a câmera e clicou em compartilhar
-  // tela) para o anterior automaticamente antes de começar o novo.
+  // vez. Se já tiver uma faixa de vídeo ativa (ex: trocando de câmera pra
+  // tela), só troca o CONTEÚDO dela (replaceTrack) em vez de tirar e
+  // renegociar de novo - renegociar duas vezes em sequência (parar +
+  // começar) cria uma corrida entre as respostas SDP e derruba a chamada
+  // com "Called in wrong state". Só uma nova faixa (do zero) precisa de
+  // renegociação de verdade.
   const startVideoShare = useCallback(async (videoKind) => {
-    if (videoStreamRef.current) await stopVideoShare();
+    if (videoKindRef.current === videoKind) return;
     if (videoKind === "screen" && !supportsScreenShare()) {
       alert(getScreenShareUnavailableMessage());
       return;
@@ -682,13 +686,24 @@ export function CallProvider({ user, conversations, children }) {
           : await navigator.mediaDevices.getUserMedia({ video: buildVideoConstraints() });
       const track = stream.getVideoTracks()[0];
       if (!track) return;
+
+      const previousStream = videoStreamRef.current;
+      const sender = pcRef.current?.getSenders().find((s) => s.track?.kind === "video");
+      track.onended = () => stopVideoShare();
       videoStreamRef.current = stream;
       videoKindRef.current = videoKind;
-      track.onended = () => stopVideoShare();
-      pcRef.current?.addTrack(track, stream);
       setLocalVideoStream(stream);
       setLocalVideoKind(videoKind);
-      await renegotiatePrivateCall(videoKind);
+
+      if (sender) {
+        await sender.replaceTrack(track);
+        send(conversationIdRef.current, "call-video-kind", { to: peerIdRef.current, callId: callIdRef.current, videoKind });
+      } else {
+        pcRef.current?.addTrack(track, stream);
+        await renegotiatePrivateCall(videoKind);
+      }
+
+      previousStream?.getTracks().forEach((t) => t.stop());
     } catch (err) {
       if (err?.name !== "NotAllowedError") console.error("Não foi possível iniciar o vídeo:", err);
     }
@@ -809,9 +824,11 @@ export function CallProvider({ user, conversations, children }) {
   }, [renegotiateGroupScreen]);
 
   // Inicia o envio de vídeo (tela ou câmera) pra TODOS os participantes da
-  // chamada em grupo de uma vez - mesma regra da 1-a-1: só um vídeo por vez.
+  // chamada em grupo de uma vez - mesma regra da 1-a-1: só um vídeo por vez,
+  // e trocar de tipo com uma faixa já ativa usa replaceTrack (sem
+  // renegociar de novo) pra não disparar duas renegociações em corrida.
   const startGroupVideoShare = useCallback(async (videoKind) => {
-    if (groupVideoStreamRef.current) await stopGroupVideoShare();
+    if (groupVideoKindRef.current === videoKind) return;
     if (videoKind === "screen" && !supportsScreenShare()) {
       alert(getScreenShareUnavailableMessage());
       return;
@@ -823,13 +840,30 @@ export function CallProvider({ user, conversations, children }) {
           : await navigator.mediaDevices.getUserMedia({ video: buildVideoConstraints() });
       const track = stream.getVideoTracks()[0];
       if (!track) return;
+
+      const previousStream = groupVideoStreamRef.current;
+      const hadVideo = !!previousStream;
+      track.onended = () => stopGroupVideoShare();
       groupVideoStreamRef.current = stream;
       groupVideoKindRef.current = videoKind;
-      track.onended = () => stopGroupVideoShare();
-      for (const pc of groupPcsRef.current.values()) pc.addTrack(track, stream);
       setGroupLocalVideoStream(stream);
       setGroupLocalVideoKind(videoKind);
-      await renegotiateGroupScreen(videoKind);
+
+      if (hadVideo) {
+        for (const pc of groupPcsRef.current.values()) {
+          const sender = pc.getSenders().find((s) => s.track?.kind === "video");
+          if (sender) await sender.replaceTrack(track);
+        }
+        const convId = groupConversationIdRef.current;
+        for (const peerId of groupPcsRef.current.keys()) {
+          send(convId, "group-call-signal", { to: peerId, kind: "video-kind", videoKind });
+        }
+      } else {
+        for (const pc of groupPcsRef.current.values()) pc.addTrack(track, stream);
+        await renegotiateGroupScreen(videoKind);
+      }
+
+      previousStream?.getTracks().forEach((t) => t.stop());
     } catch (err) {
       if (err?.name !== "NotAllowedError") console.error("Não foi possível iniciar o vídeo:", err);
     }
@@ -946,7 +980,7 @@ export function CallProvider({ user, conversations, children }) {
           if (payload.from === user.id || payload.callId !== callIdRef.current) return;
           clearTimeout(ringTimeoutRef.current);
           const pc = pcRef.current;
-          if (!pc) return;
+          if (!pc || pc.signalingState !== "have-local-offer") return;
           await pc.setRemoteDescription(payload.sdp);
           remoteDescSetRef.current = true;
           await flushPendingCandidates();
@@ -958,6 +992,7 @@ export function CallProvider({ user, conversations, children }) {
         .on("broadcast", { event: "call-screen-offer" }, async ({ payload }) => {
           if (payload.from === user.id || payload.callId !== callIdRef.current || !pcRef.current) return;
           const pc = pcRef.current;
+          if (pc.signalingState !== "stable") return;
           await pc.setRemoteDescription(payload.sdp);
           const answer = await pc.createAnswer();
           await pc.setLocalDescription(answer);
@@ -966,7 +1001,15 @@ export function CallProvider({ user, conversations, children }) {
         })
         .on("broadcast", { event: "call-screen-answer" }, async ({ payload }) => {
           if (payload.from === user.id || payload.callId !== callIdRef.current || !pcRef.current) return;
+          // Uma resposta pode chegar depois que a conexão já voltou a ficar
+          // "stable" (ex: outra renegociação terminou primeiro) - nesse caso
+          // essa resposta está desatualizada; aplicá-la quebra a conexão.
+          if (pcRef.current.signalingState !== "have-local-offer") return;
           await pcRef.current.setRemoteDescription(payload.sdp);
+        })
+        .on("broadcast", { event: "call-video-kind" }, ({ payload }) => {
+          if (payload.from === user.id || payload.callId !== callIdRef.current) return;
+          setRemoteVideoKind(payload.videoKind || null);
         })
         .on("broadcast", { event: "call-screen-stop" }, ({ payload }) => {
           if (payload.from === user.id || payload.callId !== callIdRef.current) return;
@@ -1017,6 +1060,7 @@ export function CallProvider({ user, conversations, children }) {
               groupVideoStreamRef.current?.getVideoTracks().forEach((t) => pc.addTrack(t, groupVideoStreamRef.current));
               await boostAudioBitrate(pc);
             }
+            if (pc.signalingState !== "stable") return;
             await pc.setRemoteDescription(payload.sdp);
             await flushGroupPendingCandidates(payload.from);
             const answer = await pc.createAnswer();
@@ -1035,7 +1079,7 @@ export function CallProvider({ user, conversations, children }) {
             send(id, "group-call-signal", { to: payload.from, kind: "answer", sdp: answer, videoKind: groupVideoKindRef.current });
           } else if (payload.kind === "answer") {
             const pc = groupPcsRef.current.get(payload.from);
-            if (pc) {
+            if (pc && pc.signalingState === "have-local-offer") {
               await pc.setRemoteDescription(payload.sdp);
               await flushGroupPendingCandidates(payload.from);
             }
@@ -1044,7 +1088,7 @@ export function CallProvider({ user, conversations, children }) {
             }
           } else if (payload.kind === "screen-offer") {
             const pc = groupPcsRef.current.get(payload.from);
-            if (!pc) return;
+            if (!pc || pc.signalingState !== "stable") return;
             await pc.setRemoteDescription(payload.sdp);
             const answer = await pc.createAnswer();
             await pc.setLocalDescription(answer);
@@ -1057,7 +1101,11 @@ export function CallProvider({ user, conversations, children }) {
             send(id, "group-call-signal", { to: payload.from, kind: "screen-answer", sdp: answer });
           } else if (payload.kind === "screen-answer") {
             const pc = groupPcsRef.current.get(payload.from);
-            if (pc) await pc.setRemoteDescription(payload.sdp);
+            // Resposta desatualizada (outra renegociação já concluiu antes
+            // dela chegar) - aplicá-la quebraria a conexão.
+            if (pc && pc.signalingState === "have-local-offer") await pc.setRemoteDescription(payload.sdp);
+          } else if (payload.kind === "video-kind") {
+            setGroupRemoteVideoKinds((prev) => ({ ...prev, [payload.from]: payload.videoKind || null }));
           } else if (payload.kind === "screen-stop") {
             setGroupRemoteVideos((prev) => {
               const next = { ...prev };

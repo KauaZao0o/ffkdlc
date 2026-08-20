@@ -36,6 +36,11 @@ export default function SearchDrawer({ onClose }) {
     onClose();
   }
 
+  // A API já devolve em ordem alfabética - só precisamos separar em dois
+  // grupos (online primeiro) mantendo essa mesma ordem dentro de cada um.
+  const onlineResults = results.filter((u) => !!onlineMap[u.id]);
+  const offlineResults = results.filter((u) => !onlineMap[u.id]);
+
   return (
     <div className="drawer-overlay" onClick={onClose}>
       <div className="drawer-panel" onClick={(e) => e.stopPropagation()} style={{ width: 320 }}>
@@ -62,34 +67,66 @@ export default function SearchDrawer({ onClose }) {
           </p>
         )}
 
-        <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-          {results.map((u) => (
-            <button
-              key={u.id}
-              onClick={() => handlePick(u.username)}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 10,
-                width: "100%",
-                textAlign: "left",
-                border: "none",
-                borderRadius: 8,
-                padding: "8px 6px",
-                background: "transparent",
-              }}
-            >
-              <Avatar
-                username={u.username}
-                avatarColor={u.avatarColor}
-                avatarUrl={u.avatarUrl}
-                size={34}
-                isOnline={!!onlineMap[u.id]}
-              />
-              <span style={{ fontSize: 14 }}>{u.username}</span>
-            </button>
-          ))}
-        </div>
+        {onlineResults.length > 0 && (
+          <>
+            <p style={{ fontSize: 12, fontWeight: 600, color: "var(--text-faint)", textTransform: "uppercase", letterSpacing: "0.04em", margin: "0 0 4px" }}>
+              Online ({onlineResults.length})
+            </p>
+            <div style={{ display: "flex", flexDirection: "column", gap: 2, marginBottom: offlineResults.length > 0 ? 16 : 0 }}>
+              {onlineResults.map((u) => (
+                <button
+                  key={u.id}
+                  onClick={() => handlePick(u.username)}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
+                    width: "100%",
+                    textAlign: "left",
+                    border: "none",
+                    borderRadius: 8,
+                    padding: "8px 6px",
+                    background: "transparent",
+                  }}
+                >
+                  <Avatar username={u.username} avatarColor={u.avatarColor} avatarUrl={u.avatarUrl} size={34} isOnline />
+                  <span style={{ fontSize: 14 }}>{u.username}</span>
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+
+        {offlineResults.length > 0 && (
+          <>
+            <p style={{ fontSize: 12, fontWeight: 600, color: "var(--text-faint)", textTransform: "uppercase", letterSpacing: "0.04em", margin: "0 0 4px" }}>
+              Offline ({offlineResults.length})
+            </p>
+            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+              {offlineResults.map((u) => (
+                <button
+                  key={u.id}
+                  onClick={() => handlePick(u.username)}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
+                    width: "100%",
+                    textAlign: "left",
+                    border: "none",
+                    borderRadius: 8,
+                    padding: "8px 6px",
+                    background: "transparent",
+                    opacity: 0.7,
+                  }}
+                >
+                  <Avatar username={u.username} avatarColor={u.avatarColor} avatarUrl={u.avatarUrl} size={34} isOnline={false} />
+                  <span style={{ fontSize: 14 }}>{u.username}</span>
+                </button>
+              ))}
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
