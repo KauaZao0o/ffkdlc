@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
+import bcrypt from "bcryptjs";
 import prisma from "@/lib/prisma";
-import { getUserIdFromRequest } from "@/lib/auth";
+import { getUserIdFromRequest, clearAuthCookie } from "@/lib/auth";
 
 export async function GET(request) {
   const userId = getUserIdFromRequest(request);
@@ -62,4 +63,39 @@ export async function PATCH(request) {
     avatarColor: user.avatarColor,
     avatarUrl: user.avatarUrl,
   });
+}
+
+// Apaga a própria conta (e, em cascata, suas mensagens/participações,
+// graças ao onDelete: Cascade no schema). Pede a senha atual de novo por
+// segurança - mesma exigência da troca de senha. A conta Ghost não pode se
+// apagar por essa rota (ela não deveria sumir por engano).
+export async function DELETE(request) {
+  const userId = getUserIdFromRequest(request);
+  if (!userId) {
+    return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
+  }
+
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) {
+    return NextResponse.json({ error: "Usuário não encontrado." }, { status: 404 });
+  }
+  if (user.isGhost) {
+    return NextResponse.json({ error: "Essa conta não pode ser apagada por aqui." }, { status: 403 });
+  }
+
+  const { password } = await request.json();
+  if (!password) {
+    return NextResponse.json({ error: "Digite sua senha para confirmar." }, { status: 400 });
+  }
+
+  const isValid = await bcrypt.compare(password, user.passwordHash);
+  if (!isValid) {
+    return NextResponse.json({ error: "Senha incorreta." }, { status: 401 });
+  }
+
+  await prisma.user.delete({ where: { id: userId } });
+
+  const response = NextResponse.json({ ok: true });
+  clearAuthCookie(response);
+  return response;
 }

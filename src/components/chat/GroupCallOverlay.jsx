@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Avatar from "@/components/common/Avatar.jsx";
 import CallAudioSettingsModal from "./CallAudioSettingsModal.jsx";
 import ScreenShareVideo from "./ScreenShareVideo.jsx";
-import { MinimizeIcon, ScreenShareIcon } from "./CallIcons.jsx";
+import { MinimizeIcon, ScreenShareIcon, CameraIcon } from "./CallIcons.jsx";
 
 function formatCallDuration(totalSeconds) {
   const m = Math.floor(totalSeconds / 60).toString().padStart(2, "0");
@@ -26,18 +26,20 @@ export default function GroupCallOverlay({ call }) {
     toggleGroupMute,
     switchGroupMicrophone,
     switchGroupSpeaker,
-    groupIsScreenSharing,
-    groupLocalScreenStream,
-    groupRemoteScreens,
+    groupLocalVideoKind,
+    groupLocalVideoStream,
+    groupRemoteVideos,
+    groupRemoteVideoKinds,
     toggleGroupScreenShare,
+    toggleGroupCamera,
   } = call;
   const [showAudioSettings, setShowAudioSettings] = useState(false);
   const [screensMinimized, setScreensMinimized] = useState(false);
-  const hasScreen = !!(groupLocalScreenStream || Object.keys(groupRemoteScreens).length > 0);
+  const hasVideo = !!(groupLocalVideoStream || Object.keys(groupRemoteVideos).length > 0);
 
   useEffect(() => {
-    if (hasScreen) setScreensMinimized(false);
-  }, [hasScreen, groupLocalScreenStream, groupRemoteScreens]);
+    if (hasVideo) setScreensMinimized(false);
+  }, [hasVideo, groupLocalVideoStream, groupRemoteVideos]);
 
   // Em grupo a faixa de participantes pode ocupar uma segunda linha.
   useEffect(() => {
@@ -72,8 +74,8 @@ export default function GroupCallOverlay({ call }) {
             {connectingCount > 0 && ` · conectando ${connectingCount}...`}
           </span>
           <div className="call-control-actions">
-            {hasScreen && (
-              <button type="button" className="call-control-button" onClick={() => setScreensMinimized((value) => !value)} title={screensMinimized ? "Mostrar compartilhamentos" : "Voltar ao chat"}>
+            {hasVideo && (
+              <button type="button" className="call-control-button" onClick={() => setScreensMinimized((value) => !value)} title={screensMinimized ? "Mostrar vídeos" : "Voltar ao chat"}>
                 {screensMinimized ? <ScreenShareIcon /> : <MinimizeIcon />}
               </button>
             )}
@@ -117,9 +119,17 @@ export default function GroupCallOverlay({ call }) {
             </button>
             <button
               type="button"
+              onClick={toggleGroupCamera}
+              title={groupLocalVideoKind === "camera" ? "Desligar câmera" : "Ligar câmera"}
+              className={groupLocalVideoKind === "camera" ? "call-control-button active" : "call-control-button"}
+            >
+              <CameraIcon />
+            </button>
+            <button
+              type="button"
               onClick={toggleGroupScreenShare}
-              title={groupIsScreenSharing ? "Parar de compartilhar tela" : "Compartilhar tela"}
-              className={groupIsScreenSharing ? "call-control-button active" : "call-control-button"}
+              title={groupLocalVideoKind === "screen" ? "Parar de compartilhar tela" : "Compartilhar tela"}
+              className={groupLocalVideoKind === "screen" ? "call-control-button active" : "call-control-button"}
             >
               <ScreenShareIcon />
             </button>
@@ -169,13 +179,23 @@ export default function GroupCallOverlay({ call }) {
         )}
       </div>
 
-      {hasScreen && !screensMinimized && (
-        <div className="screen-share-dock" aria-label="Telas compartilhadas">
+      {hasVideo && !screensMinimized && (
+        <div className="screen-share-dock" aria-label="Vídeos da chamada">
           <button type="button" className="screen-share-minimize" onClick={() => setScreensMinimized(true)} title="Voltar ao chat" aria-label="Voltar ao chat"><MinimizeIcon /></button>
-          <ScreenShareVideo stream={groupLocalScreenStream} label="Você está compartilhando" muted />
-          {Object.entries(groupRemoteScreens).map(([peerId, stream]) => {
+          {groupLocalVideoStream && (
+            <ScreenShareVideo
+              stream={groupLocalVideoStream}
+              label={groupLocalVideoKind === "camera" ? "Você" : "Você está compartilhando"}
+              muted
+              mirrored={groupLocalVideoKind === "camera"}
+            />
+          )}
+          {Object.entries(groupRemoteVideos).map(([peerId, stream]) => {
             const peer = groupCallPeers.find((p) => p.id === peerId);
-            return <ScreenShareVideo key={peerId} stream={stream} label={`${peer?.username || "Participante"} está compartilhando`} />;
+            const kind = groupRemoteVideoKinds[peerId];
+            const name = peer?.username || "Participante";
+            const label = kind === "camera" ? `${name} ligou a câmera` : kind === "screen" ? `${name} está compartilhando` : name;
+            return <ScreenShareVideo key={peerId} stream={stream} label={label} />;
           })}
         </div>
       )}

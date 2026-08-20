@@ -24,7 +24,7 @@ export default function ConversationList({ conversations, activeId, onSelect, on
           <button onClick={onNewGroup} title="Criar grupo">+ Grupo</button>
         </div>
       </div>
-      <div style={{ flex: 1, overflowY: "auto" }}>
+      <div style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
         {conversations.length === 0 && (
           <p style={{ padding: 16, fontSize: 13, color: "var(--text-faint)" }}>Nenhuma conversa ainda. Comece uma nova!</p>
         )}

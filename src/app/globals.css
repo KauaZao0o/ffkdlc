@@ -416,9 +416,11 @@ button:disabled {
   border-bottom: 1px solid rgba(255, 255, 255, .09);
   box-shadow: 0 8px 28px rgba(0, 0, 0, .28);
   backdrop-filter: blur(16px);
+  display: flex;
+  flex-direction: column;
 }
 
-.call-control-bar, .call-control-row {
+.call-control-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -498,6 +500,7 @@ body.call-active .app-layout {
 .sidebar {
   width: 280px;
   flex-shrink: 0;
+  min-height: 0;
   border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
@@ -517,6 +520,7 @@ body.call-active .app-layout {
 .chat-main {
   flex: 1;
   min-width: 0;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   background: var(--bg);
@@ -525,6 +529,8 @@ body.call-active .app-layout {
 .participants-panel {
   width: 220px;
   flex-shrink: 0;
+  min-height: 0;
+  overflow-y: auto;
   border-left: 1px solid var(--border);
   padding: 16px;
   background: var(--surface);
