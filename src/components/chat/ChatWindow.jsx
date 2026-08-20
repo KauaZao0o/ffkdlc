@@ -263,7 +263,7 @@ export default function ChatWindow({ conversation, onHideConversation, onBack, o
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          gap: 8,
+          gap: 20,
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, flex: 1 }}>

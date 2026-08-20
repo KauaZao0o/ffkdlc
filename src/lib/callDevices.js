@@ -56,12 +56,15 @@ export function buildAudioConstraints() {
   };
 }
 
-// Constraints da câmera na chamada de vídeo - câmera frontal, resolução
-// moderada (suficiente pra chamada, sem pesar demais na rede).
+// Constraints da câmera na chamada de vídeo - câmera frontal, enquadramento
+// horizontal (16:9) e resolução moderada (suficiente pra chamada, sem pesar
+// demais na rede). O aspectRatio pede explicitamente um quadro na horizontal
+// pro navegador, em vez de deixar a câmera decidir sozinha.
 export function buildVideoConstraints() {
   return {
     facingMode: "user",
     width: { ideal: 1280 },
     height: { ideal: 720 },
+    aspectRatio: { ideal: 16 / 9 },
   };
 }

@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabaseClient";
-import { checkWinner } from "@/lib/ticTacToe";
+import { GAMES } from "@/lib/games";
 
 const GameContext = createContext(null);
 
@@ -12,13 +12,25 @@ function randomId() {
   return Math.random().toString(36).slice(2) + Date.now().toString(36);
 }
 
-// Todo o multiplayer de jogos (por enquanto só jogo da velha) fica isolado
-// aqui, montado uma vez na página do chat - igual ao CallContext. Cada
-// pessoa escuta sua própria "caixa de entrada" (game-inbox-<userId>) pra
-// poder receber um desafio de qualquer lugar do site, mesmo sem ter o
-// painel de jogos aberto. Depois que os dois aceitam, entram numa sala
-// (game-room-<gameId>) só deles pra trocar as jogadas em tempo real - tudo
-// via broadcast do Supabase, sem precisar guardar nada no banco.
+// Todo o multiplayer de jogos fica isolado aqui, montado uma vez na página
+// do chat - igual ao CallContext. Cada pessoa escuta sua própria "caixa de
+// entrada" (game-inbox-<userId>) pra poder receber um desafio de qualquer
+// lugar do site, mesmo sem ter o painel de jogos aberto. Depois que os dois
+// aceitam, entram numa sala (game-room-<gameId>) só deles pra trocar as
+// jogadas em tempo real - tudo via broadcast do Supabase, sem precisar
+// guardar nada no banco.
+//
+// Cada jogo (jogo da velha, dama, uno, truco) só define as regras em
+// src/lib/games/*.js (estado inicial, validar+aplicar uma jogada, checar
+// quem venceu) - toda a parte de desafio/sala/reconexão é genérica e igual
+// pra qualquer jogo novo que for adicionado.
+//
+// Jogos como uno/truco embaralham cartas (aleatório) - pra não embaralhar
+// diferente em cada tela, só quem desafiou (símbolo "X") sorteia o estado
+// inicial e manda pronto pra outra pessoa (evento "state-init"); quem
+// aceitou só espera chegar. Dali em diante, cada jogada já é determinística
+// (mesma função aplicada aos dois lados), então só precisa transmitir a
+// jogada em si, não o estado inteiro.
 export function GameProvider({ user, children }) {
   const [incomingChallenge, setIncomingChallenge] = useState(null);
   const [outgoingChallenge, setOutgoingChallenge] = useState(null);
@@ -62,14 +74,25 @@ export function GameProvider({ user, children }) {
     }
   }
 
-  function startGameRoom(gameId, opponentId, opponentUsername, opponentAvatarColor, opponentAvatarUrl, mySymbol) {
+  function buildResultMessage(outcome, mySymbol) {
+    if (outcome.winner === "draw") return "Empate!";
+    return outcome.winner === mySymbol ? "Você venceu! 🎉" : "Você perdeu.";
+  }
+
+  function startGameRoom(gameId, gameType, opponentId, opponentUsername, opponentAvatarColor, opponentAvatarUrl, mySymbol) {
     cleanupRoom();
     const supabase = getSupabaseBrowserClient();
+    const gameModule = GAMES[gameType];
+
     const channel = supabase
       .channel(`game-room-${gameId}`)
+      .on("broadcast", { event: "state-init" }, ({ payload }) => {
+        if (payload.by === userRef.current?.id) return;
+        setActiveGame((prev) => (prev ? { ...prev, ...payload.state, status: "playing" } : prev));
+      })
       .on("broadcast", { event: "move" }, ({ payload }) => {
         if (payload.by === userRef.current?.id) return;
-        applyMove(payload.index, payload.symbol);
+        applyIncomingMove(payload.move, payload.symbol);
       })
       .on("broadcast", { event: "leave" }, ({ payload }) => {
         if (payload.by === userRef.current?.id) return;
@@ -77,42 +100,57 @@ export function GameProvider({ user, children }) {
       })
       .on("broadcast", { event: "rematch" }, ({ payload }) => {
         if (payload.by === userRef.current?.id) return;
-        setActiveGame((prev) =>
-          prev ? { ...prev, board: Array(9).fill(null), turn: "X", status: "playing", resultMessage: "", winLine: null } : prev
-        );
+        setActiveGame((prev) => (prev ? { ...prev, ...payload.state, status: "playing", resultMessage: "" } : prev));
       })
-      .subscribe();
+      .subscribe((status) => {
+        if (status !== "SUBSCRIBED" || mySymbol !== "X") return;
+        // Quem desafiou sorteia o estado inicial (baralhos etc) e manda
+        // pronto - evita os dois lados embaralharem diferente.
+        const initial = { ...gameModule.createInitialState(), turn: "X", roundStarter: "X" };
+        channel.send({ type: "broadcast", event: "state-init", payload: { by: userRef.current?.id, state: initial } });
+        setActiveGame((prev) => (prev ? { ...prev, ...initial, status: "playing" } : prev));
+      });
+
     roomChannelRef.current = channel;
 
     setActiveGame({
       gameId,
+      gameType,
       opponentId,
       opponentUsername,
       opponentAvatarColor,
       opponentAvatarUrl,
       mySymbol,
-      board: Array(9).fill(null),
-      turn: "X",
-      status: "playing",
+      status: "connecting",
       resultMessage: "",
-      winLine: null,
+      matchScore: { X: 0, O: 0 },
     });
   }
 
-  function applyMove(index, symbol) {
+  // Aplica uma jogada (minha, otimista, ou recebida do outro lado) usando a
+  // mesma função pura do jogo - como o estado já está sincronizado e a
+  // função não usa aleatoriedade, os dois lados chegam ao mesmo resultado.
+  function applyIncomingMove(move, symbol) {
     setActiveGame((prev) => {
-      if (!prev || prev.board[index] || prev.status !== "playing") return prev;
-      const board = [...prev.board];
-      board[index] = symbol;
-      const result = checkWinner(board);
-      let status = "playing";
-      let resultMessage = "";
-      if (result) {
-        status = "ended";
-        resultMessage =
-          result.winner === "draw" ? "Empate!" : result.winner === prev.mySymbol ? "Você venceu! 🎉" : "Você perdeu.";
-      }
-      return { ...prev, board, turn: symbol === "X" ? "O" : "X", status, resultMessage, winLine: result?.line || null };
+      if (!prev || prev.status !== "playing") return prev;
+      const gameModule = GAMES[prev.gameType];
+      const patch = gameModule.applyMove(prev, move, symbol);
+      if (!patch) return prev;
+
+      const merged = { ...prev, ...patch };
+      const outcome = gameModule.checkResult(merged);
+      if (!outcome) return merged;
+
+      const matchScore = { ...prev.matchScore };
+      if (outcome.winner !== "draw") matchScore[outcome.winner] = (matchScore[outcome.winner] || 0) + 1;
+
+      return {
+        ...merged,
+        status: "ended",
+        resultMessage: buildResultMessage(outcome, prev.mySymbol),
+        matchScore,
+        winLine: outcome.line || null,
+      };
     });
   }
 
@@ -139,7 +177,7 @@ export function GameProvider({ user, children }) {
         if (!pending || pending.gameId !== payload.gameId) return;
         clearTimeout(challengeTimeoutRef.current);
         setOutgoingChallenge(null);
-        startGameRoom(pending.gameId, pending.to, pending.toUsername, pending.toAvatarColor, pending.toAvatarUrl, "X");
+        startGameRoom(pending.gameId, pending.gameType, pending.to, pending.toUsername, pending.toAvatarColor, pending.toAvatarUrl, "X");
       })
       .subscribe();
 
@@ -159,11 +197,12 @@ export function GameProvider({ user, children }) {
     };
   }, []);
 
-  function sendChallenge(target) {
-    if (!user || !target || target.id === user.id || outgoingChallengeRef.current) return;
+  function sendChallenge(target, gameType) {
+    if (!user || !target || target.id === user.id || outgoingChallengeRef.current || !GAMES[gameType]) return;
     const gameId = randomId();
     sendToInbox(target.id, "challenge", {
       gameId,
+      gameType,
       from: user.id,
       fromUsername: user.username,
       fromAvatarColor: user.avatarColor,
@@ -171,6 +210,7 @@ export function GameProvider({ user, children }) {
     });
     setOutgoingChallenge({
       gameId,
+      gameType,
       to: target.id,
       toUsername: target.username,
       toAvatarColor: target.avatarColor,
@@ -196,7 +236,15 @@ export function GameProvider({ user, children }) {
     if (!challenge) return;
     sendToInbox(challenge.from, "challenge-accepted", { gameId: challenge.gameId });
     setIncomingChallenge(null);
-    startGameRoom(challenge.gameId, challenge.from, challenge.fromUsername, challenge.fromAvatarColor, challenge.fromAvatarUrl, "O");
+    startGameRoom(
+      challenge.gameId,
+      challenge.gameType,
+      challenge.from,
+      challenge.fromUsername,
+      challenge.fromAvatarColor,
+      challenge.fromAvatarUrl,
+      "O"
+    );
   }
 
   function declineChallenge() {
@@ -206,22 +254,29 @@ export function GameProvider({ user, children }) {
     setIncomingChallenge(null);
   }
 
-  function makeMove(index) {
+  function makeMove(move) {
     const game = activeGameRef.current;
-    if (!game || game.board[index] || game.status !== "playing" || game.turn !== game.mySymbol) return;
-    applyMove(index, game.mySymbol);
+    if (!game || game.status !== "playing" || game.turn !== game.mySymbol) return;
+    applyIncomingMove(move, game.mySymbol);
     roomChannelRef.current?.send({
       type: "broadcast",
       event: "move",
-      payload: { index, symbol: game.mySymbol, by: userRef.current?.id },
+      payload: { move, symbol: game.mySymbol, by: userRef.current?.id },
     });
   }
 
+  // Quem clica em "jogar de novo" sorteia a próxima rodada e já alterna
+  // quem começa jogando (antes sempre era "X" - se a pessoa fosse sempre
+  // quem desafia, sempre começaria ela).
   function rematch() {
-    roomChannelRef.current?.send({ type: "broadcast", event: "rematch", payload: { by: userRef.current?.id } });
-    setActiveGame((prev) =>
-      prev ? { ...prev, board: Array(9).fill(null), turn: "X", status: "playing", resultMessage: "", winLine: null } : prev
-    );
+    const game = activeGameRef.current;
+    if (!game) return;
+    const gameModule = GAMES[game.gameType];
+    const nextStarter = game.roundStarter === "X" ? "O" : "X";
+    const initial = { ...gameModule.createInitialState(), turn: nextStarter, roundStarter: nextStarter };
+
+    roomChannelRef.current?.send({ type: "broadcast", event: "rematch", payload: { by: userRef.current?.id, state: initial } });
+    setActiveGame((prev) => (prev ? { ...prev, ...initial, status: "playing", resultMessage: "" } : prev));
   }
 
   function leaveGame() {
