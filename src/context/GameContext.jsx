@@ -42,6 +42,7 @@ export function GameProvider({ user, children }) {
   const inboxChannelRef = useRef(null);
   const roomChannelRef = useRef(null);
   const challengeTimeoutRef = useRef(null);
+  const botMoveTimeoutRef = useRef(null);
 
   useEffect(() => {
     userRef.current = user;
@@ -79,7 +80,7 @@ export function GameProvider({ user, children }) {
     return outcome.winner === mySymbol ? "Você venceu! 🎉" : "Você perdeu.";
   }
 
-  function startGameRoom(gameId, gameType, opponentId, opponentUsername, opponentAvatarColor, opponentAvatarUrl, mySymbol) {
+  function startGameRoom(gameId, gameType, opponentId, opponentUsername, opponentAvatarColor, opponentAvatarUrl, mySymbol, rules) {
     cleanupRoom();
     const supabase = getSupabaseBrowserClient();
     const gameModule = GAMES[gameType];
@@ -106,7 +107,7 @@ export function GameProvider({ user, children }) {
         if (status !== "SUBSCRIBED" || mySymbol !== "X") return;
         // Quem desafiou sorteia o estado inicial (baralhos etc) e manda
         // pronto - evita os dois lados embaralharem diferente.
-        const initial = { ...gameModule.createInitialState(), turn: "X", roundStarter: "X" };
+        const initial = { ...gameModule.createInitialState(rules), turn: "X", roundStarter: "X" };
         channel.send({ type: "broadcast", event: "state-init", payload: { by: userRef.current?.id, state: initial } });
         setActiveGame((prev) => (prev ? { ...prev, ...initial, status: "playing" } : prev));
       });
@@ -116,6 +117,7 @@ export function GameProvider({ user, children }) {
     setActiveGame({
       gameId,
       gameType,
+      rules,
       opponentId,
       opponentUsername,
       opponentAvatarColor,
@@ -124,6 +126,34 @@ export function GameProvider({ user, children }) {
       status: "connecting",
       resultMessage: "",
       matchScore: { X: 0, O: 0 },
+    });
+  }
+
+  // Joga contra o bot - sem canal de sala nenhum (não tem outra pessoa pra
+  // sincronizar), o estado inicial é gerado direto aqui. As mesmas funções
+  // de jogar/revanche/sair funcionam sem alteração porque "mandar pra sala"
+  // vira um no-op quando roomChannelRef está vazio.
+  function startBotGame(gameType, difficulty = "medium", rules) {
+    cleanupRoom();
+    clearTimeout(botMoveTimeoutRef.current);
+    const gameModule = GAMES[gameType];
+    const initial = { ...gameModule.createInitialState(rules), turn: "X", roundStarter: "X" };
+
+    setActiveGame({
+      gameId: randomId(),
+      gameType,
+      rules,
+      vsBot: true,
+      difficulty,
+      opponentId: "bot",
+      opponentUsername: "Bot",
+      opponentAvatarColor: "purple",
+      opponentAvatarUrl: null,
+      mySymbol: "X",
+      status: "playing",
+      resultMessage: "",
+      matchScore: { X: 0, O: 0 },
+      ...initial,
     });
   }
 
@@ -177,7 +207,7 @@ export function GameProvider({ user, children }) {
         if (!pending || pending.gameId !== payload.gameId) return;
         clearTimeout(challengeTimeoutRef.current);
         setOutgoingChallenge(null);
-        startGameRoom(pending.gameId, pending.gameType, pending.to, pending.toUsername, pending.toAvatarColor, pending.toAvatarUrl, "X");
+        startGameRoom(pending.gameId, pending.gameType, pending.to, pending.toUsername, pending.toAvatarColor, pending.toAvatarUrl, "X", pending.rules);
       })
       .subscribe();
 
@@ -194,15 +224,35 @@ export function GameProvider({ user, children }) {
     return () => {
       cleanupRoom();
       clearTimeout(challengeTimeoutRef.current);
+      clearTimeout(botMoveTimeoutRef.current);
     };
   }, []);
 
-  function sendChallenge(target, gameType) {
+  // Quando é a vez do bot, espera um pouco (pra não parecer instantâneo
+  // demais) e joga sozinho usando a IA simples de cada jogo.
+  useEffect(() => {
+    clearTimeout(botMoveTimeoutRef.current);
+    if (!activeGame?.vsBot || activeGame.status !== "playing") return;
+    const botSymbol = activeGame.mySymbol === "X" ? "O" : "X";
+    if (activeGame.turn !== botSymbol) return;
+
+    botMoveTimeoutRef.current = setTimeout(() => {
+      const gameModule = GAMES[activeGame.gameType];
+      const move = gameModule.botMove?.(activeGame, botSymbol, activeGame.difficulty);
+      if (move) applyIncomingMove(move, botSymbol);
+    }, 500 + Math.random() * 500);
+
+    return () => clearTimeout(botMoveTimeoutRef.current);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeGame]);
+
+  function sendChallenge(target, gameType, rules) {
     if (!user || !target || target.id === user.id || outgoingChallengeRef.current || !GAMES[gameType]) return;
     const gameId = randomId();
     sendToInbox(target.id, "challenge", {
       gameId,
       gameType,
+      rules,
       from: user.id,
       fromUsername: user.username,
       fromAvatarColor: user.avatarColor,
@@ -211,6 +261,7 @@ export function GameProvider({ user, children }) {
     setOutgoingChallenge({
       gameId,
       gameType,
+      rules,
       to: target.id,
       toUsername: target.username,
       toAvatarColor: target.avatarColor,
@@ -243,7 +294,8 @@ export function GameProvider({ user, children }) {
       challenge.fromUsername,
       challenge.fromAvatarColor,
       challenge.fromAvatarUrl,
-      "O"
+      "O",
+      challenge.rules
     );
   }
 
@@ -273,7 +325,7 @@ export function GameProvider({ user, children }) {
     if (!game) return;
     const gameModule = GAMES[game.gameType];
     const nextStarter = game.roundStarter === "X" ? "O" : "X";
-    const initial = { ...gameModule.createInitialState(), turn: nextStarter, roundStarter: nextStarter };
+    const initial = { ...gameModule.createInitialState(game.rules), turn: nextStarter, roundStarter: nextStarter };
 
     roomChannelRef.current?.send({ type: "broadcast", event: "rematch", payload: { by: userRef.current?.id, state: initial } });
     setActiveGame((prev) => (prev ? { ...prev, ...initial, status: "playing", resultMessage: "" } : prev));
@@ -282,6 +334,7 @@ export function GameProvider({ user, children }) {
   function leaveGame() {
     roomChannelRef.current?.send({ type: "broadcast", event: "leave", payload: { by: userRef.current?.id } });
     cleanupRoom();
+    clearTimeout(botMoveTimeoutRef.current);
     setActiveGame(null);
   }
 
@@ -290,6 +343,7 @@ export function GameProvider({ user, children }) {
     outgoingChallenge,
     activeGame,
     sendChallenge,
+    startBotGame,
     cancelChallenge,
     acceptChallenge,
     declineChallenge,

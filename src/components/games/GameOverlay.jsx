@@ -1,6 +1,8 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import { useGame } from "@/context/GameContext.jsx";
+import { useSound } from "@/context/SoundContext.jsx";
 import { GAMES } from "@/lib/games";
 import Avatar from "@/components/common/Avatar.jsx";
 import TicTacToeBoard from "./boards/TicTacToeBoard.jsx";
@@ -15,13 +17,46 @@ const BOARDS = {
   truco: TrucoBoard,
 };
 
+const DIFFICULTY_LABEL = { easy: "Fácil", medium: "Médio", hard: "Difícil" };
+
 // Fica montado o tempo todo (igual à chamada de voz) - um desafio pode
 // chegar de qualquer lugar do site, não só com o painel de jogos aberto.
 export default function GameOverlay() {
   const { incomingChallenge, acceptChallenge, declineChallenge, activeGame, makeMove, rematch, leaveGame } = useGame();
+  const { playBattle } = useSound();
+
+  // Toca a fanfarra de desafio assim que um desafio chega (o lado que
+  // manda já ouve na hora que clica em "Desafiar", no GamesDrawer).
+  const lastChallengeIdRef = useRef(null);
+  useEffect(() => {
+    if (incomingChallenge && incomingChallenge.gameId !== lastChallengeIdRef.current) {
+      lastChallengeIdRef.current = incomingChallenge.gameId;
+      playBattle();
+    }
+    if (!incomingChallenge) lastChallengeIdRef.current = null;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [incomingChallenge]);
 
   const Board = activeGame ? BOARDS[activeGame.gameType] : null;
   const opponentSymbol = activeGame && (activeGame.mySymbol === "X" ? "O" : "X");
+
+  let statusText = "";
+  let statusClass = "game-status";
+  if (activeGame) {
+    if (activeGame.status === "connecting") {
+      statusText = "Preparando o jogo...";
+    } else if (activeGame.status === "playing") {
+      const myTurn = activeGame.turn === activeGame.mySymbol;
+      statusText = myTurn ? "Sua vez" : `Vez de ${activeGame.opponentUsername}`;
+      if (myTurn) statusClass += " my-turn";
+    } else if (activeGame.status === "opponent-left") {
+      statusText = `${activeGame.opponentUsername} saiu do jogo.`;
+    } else {
+      statusText = activeGame.resultMessage;
+      if (activeGame.resultMessage?.includes("venceu")) statusClass += " result-won";
+      else if (activeGame.resultMessage?.includes("perdeu")) statusClass += " result-lost";
+    }
+  }
 
   return (
     <>
@@ -37,17 +72,7 @@ export default function GameOverlay() {
             justifyContent: "center",
           }}
         >
-          <div
-            style={{
-              background: "var(--surface)",
-              color: "var(--text)",
-              borderRadius: 16,
-              padding: 28,
-              width: 300,
-              maxWidth: "85vw",
-              textAlign: "center",
-            }}
-          >
+          <div className="game-modal" style={{ width: 300 }}>
             <Avatar
               username={incomingChallenge.fromUsername}
               avatarColor={incomingChallenge.fromAvatarColor}
@@ -58,7 +83,7 @@ export default function GameOverlay() {
             <p style={{ margin: "0 0 20px", fontSize: 13, color: "var(--text-muted)" }}>
               te desafiou pro {GAMES[incomingChallenge.gameType]?.label || "jogo"}
             </p>
-            <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
+            <div className="game-actions">
               <button onClick={declineChallenge}>Recusar</button>
               <button onClick={acceptChallenge} className="primary">
                 Aceitar
@@ -82,41 +107,22 @@ export default function GameOverlay() {
             overflowY: "auto",
           }}
         >
-          <div
-            style={{
-              background: "var(--surface)",
-              color: "var(--text)",
-              borderRadius: 16,
-              padding: 24,
-              width: 340,
-              maxWidth: "94vw",
-              textAlign: "center",
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, marginBottom: 4 }}>
+          <div className="game-modal">
+            <div className="game-vs-row">
               <Avatar username={activeGame.opponentUsername} avatarColor={activeGame.opponentAvatarColor} avatarUrl={activeGame.opponentAvatarUrl} size={30} />
-              <p style={{ margin: 0, fontSize: 14, fontWeight: 500 }}>
+              <p className="game-vs-name" style={{ margin: 0 }}>
                 Você vs {activeGame.opponentUsername}
+                {activeGame.vsBot && <span className="game-difficulty-tag"> ({DIFFICULTY_LABEL[activeGame.difficulty] || "Médio"})</span>}
               </p>
             </div>
 
             {activeGame.matchScore && (activeGame.matchScore.X > 0 || activeGame.matchScore.O > 0) && (
-              <p style={{ margin: "0 0 4px", fontSize: 12, color: "var(--text-faint)" }}>
+              <p className="game-score">
                 Placar: você {activeGame.matchScore[activeGame.mySymbol]} · {activeGame.opponentUsername} {activeGame.matchScore[opponentSymbol]}
               </p>
             )}
 
-            <p style={{ fontSize: 13, color: "var(--text-muted)", minHeight: 18, margin: "4px 0 16px" }}>
-              {activeGame.status === "connecting"
-                ? "Preparando o jogo..."
-                : activeGame.status === "playing"
-                ? activeGame.turn === activeGame.mySymbol
-                  ? "Sua vez"
-                  : `Vez de ${activeGame.opponentUsername}`
-                : activeGame.status === "opponent-left"
-                ? `${activeGame.opponentUsername} saiu do jogo.`
-                : activeGame.resultMessage}
-            </p>
+            <p className={statusClass}>{statusText}</p>
 
             <div style={{ margin: "0 0 20px" }}>
               {activeGame.status === "connecting" || !Board ? (
@@ -126,7 +132,7 @@ export default function GameOverlay() {
               )}
             </div>
 
-            <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
+            <div className="game-actions">
               {activeGame.status === "ended" && (
                 <button onClick={rematch} className="primary">
                   Jogar de novo
