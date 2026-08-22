@@ -837,3 +837,224 @@ body.call-active .app-layout {
     width: 100%;
   }
 }
+
+/* ---------- Jogos ---------- */
+
+.game-modal {
+  background: var(--surface);
+  color: var(--text);
+  border-radius: 20px;
+  padding: 28px 24px;
+  width: 360px;
+  max-width: 94vw;
+  text-align: center;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
+  animation: game-modal-in 0.2s ease;
+}
+
+@keyframes game-modal-in {
+  from {
+    opacity: 0;
+    transform: scale(0.94) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.game-vs-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+.game-vs-name {
+  font-size: 15px;
+  font-weight: 600;
+}
+.game-difficulty-tag {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-faint);
+}
+
+.game-score {
+  font-size: 12px;
+  color: var(--text-faint);
+  margin: 4px 0 2px;
+  letter-spacing: 0.02em;
+}
+
+.game-status {
+  font-size: 13px;
+  min-height: 22px;
+  margin: 6px 0 18px;
+  font-weight: 500;
+  color: var(--text-muted);
+  transition: color 0.15s ease;
+}
+.game-status.my-turn {
+  color: var(--success);
+  font-weight: 600;
+}
+.game-status.result-won {
+  color: var(--success);
+  font-size: 16px;
+  font-weight: 700;
+}
+.game-status.result-lost {
+  color: var(--danger);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.game-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+
+/* Jogo da velha */
+.ttt-board {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  width: 216px;
+  margin: 0 auto;
+}
+.ttt-cell {
+  aspect-ratio: 1 / 1;
+  border-radius: 12px;
+  border: none;
+  background: var(--surface-hover);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px;
+  transition: background 0.15s ease, transform 0.1s ease;
+}
+.ttt-cell:not(:disabled):hover {
+  background: var(--border);
+}
+.ttt-cell:not(:disabled):active {
+  transform: scale(0.94);
+}
+.ttt-cell.win {
+  background: var(--success);
+}
+.ttt-cell.fading svg {
+  opacity: 0.35;
+}
+.ttt-cell svg {
+  width: 100%;
+  height: 100%;
+  animation: ttt-pop 0.16s ease;
+}
+.ttt-cell .mark-x {
+  color: var(--group-avatar-fg);
+}
+.ttt-cell .mark-o {
+  color: var(--danger);
+}
+.ttt-cell.win svg {
+  color: #fff;
+}
+@keyframes ttt-pop {
+  from {
+    transform: scale(0.4);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* Dama */
+.checkers-board {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  width: 280px;
+  margin: 0 auto;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.3);
+}
+.checkers-cell {
+  aspect-ratio: 1 / 1;
+  border: none;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+.checkers-cell.dark {
+  background: #5b4636;
+}
+.checkers-cell.light {
+  background: #e8d9bd;
+}
+.checkers-cell.selected {
+  box-shadow: inset 0 0 0 3px var(--success);
+}
+.checkers-cell.hint::after {
+  content: "";
+  position: absolute;
+  width: 24%;
+  height: 24%;
+  border-radius: 50%;
+  background: rgba(79, 168, 79, 0.6);
+}
+.checkers-cell.hint-capture::after {
+  background: rgba(224, 104, 90, 0.7);
+}
+.checkers-piece {
+  width: 78%;
+  height: 78%;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  font-weight: 700;
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.4), inset 0 -3px 6px rgba(0, 0, 0, 0.18), inset 0 2px 3px rgba(255, 255, 255, 0.3);
+  transition: transform 0.12s ease;
+}
+.checkers-piece.symbol-x {
+  background: linear-gradient(160deg, #e15b5b, #b93636);
+  color: #fff;
+}
+.checkers-piece.symbol-o {
+  background: linear-gradient(160deg, #fbfbfa, #d9d4c9);
+  color: #4a4536;
+}
+.checkers-cell.selected .checkers-piece {
+  transform: scale(1.08);
+}
+
+/* Cartas (uno/truco) */
+.playing-card {
+  border-radius: 8px;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.3);
+  flex-shrink: 0;
+  border: none;
+  padding: 0;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+.playing-card:not(:disabled):hover {
+  transform: translateY(-5px);
+  box-shadow: 0 10px 18px rgba(0, 0, 0, 0.35);
+}
+.playing-card:disabled {
+  cursor: default;
+}
+.playing-card-back {
+  border-radius: 8px;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.3);
+  background: repeating-linear-gradient(45deg, #2a3a5c, #2a3a5c 4px, #223054 4px, #223054 8px);
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  flex-shrink: 0;
+}

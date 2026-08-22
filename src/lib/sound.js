@@ -122,3 +122,46 @@ export function startRingtone() {
     return () => {};
   }
 }
+
+// Fanfarra curta de "chamado pra batalha" - toca quando um desafio de jogo
+// é enviado/chega, tipo o toque de início de partida de jogos de estratégia
+// (só que sintetizado aqui, sem depender de nenhum arquivo de áudio).
+function scheduleBattleFanfare(ctx) {
+  const now = ctx.currentTime;
+
+  function stab(freq, start, duration, type, peak) {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, now + start);
+    gain.gain.setValueAtTime(0, now + start);
+    gain.gain.linearRampToValueAtTime(peak, now + start + 0.015);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + start + duration);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(now + start);
+    osc.stop(now + start + duration + 0.05);
+  }
+
+  // Três toques de corneta subindo, com um grave de apoio embaixo do
+  // último - dá aquele clima de "começou o desafio".
+  stab(392.0, 0, 0.14, "sawtooth", 0.2); // Sol
+  stab(523.25, 0.12, 0.14, "sawtooth", 0.2); // Dó
+  stab(659.25, 0.24, 0.26, "sawtooth", 0.22); // Mi (segura mais)
+  stab(196.0, 0.24, 0.3, "triangle", 0.26); // grave junto do Mi final
+}
+
+export function playBattleCall() {
+  try {
+    const ctx = getAudioContext();
+    if (!ctx) return;
+
+    if (ctx.state === "suspended") {
+      ctx.resume().then(() => scheduleBattleFanfare(ctx)).catch(() => {});
+    } else {
+      scheduleBattleFanfare(ctx);
+    }
+  } catch (err) {
+    console.error("Não foi possível tocar o som de desafio:", err);
+  }
+}

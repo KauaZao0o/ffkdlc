@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState } from "react";
-import { playChime, unlockAudio } from "@/lib/sound";
+import { playChime, playBattleCall, unlockAudio } from "@/lib/sound";
 
 const SoundContext = createContext(null);
 const STORAGE_KEY = "chat-sound-enabled";
@@ -44,7 +44,11 @@ export function SoundProvider({ children }) {
     if (enabled) playChime();
   }
 
-  return <SoundContext.Provider value={{ enabled, toggle, play }}>{children}</SoundContext.Provider>;
+  function playBattle() {
+    if (enabled) playBattleCall();
+  }
+
+  return <SoundContext.Provider value={{ enabled, toggle, play, playBattle }}>{children}</SoundContext.Provider>;
 }
 
 export function useSound() {

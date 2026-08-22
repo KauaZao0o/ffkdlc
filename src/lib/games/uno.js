@@ -126,3 +126,51 @@ export function checkResult(state) {
   if (state.hands.O.length === 0) return { winner: "O" };
   return null;
 }
+
+function bestColorForHand(hand) {
+  const counts = { red: 0, yellow: 0, green: 0, blue: 0 };
+  hand.forEach((c) => {
+    if (c.color) counts[c.color] += 1;
+  });
+  return COLORS.reduce((best, color) => (counts[color] > counts[best] ? color : best), COLORS[0]);
+}
+
+function playCardResult(hand, index) {
+  const card = hand[index];
+  if (card.color === null) return { action: "play", cardIndex: index, chosenColor: bestColorForHand(hand) };
+  return { action: "play", cardIndex: index };
+}
+
+// difficulty: "easy" (joga qualquer carta válida ao acaso, cor aleatória no
+// curinga) | "medium" (guarda os curingas pra quando não tiver outra opção,
+// escolhe a cor que mais tem na mão) | "hard" (igual ao médio, mas quando o
+// adversário está com poucas cartas prioriza cartas ofensivas - +2/+4/pular).
+export function botMove(state, symbol, difficulty = "medium") {
+  const hand = state.hands[symbol];
+  const topCard = state.discard[state.discard.length - 1];
+  const playableIndices = hand.map((c, i) => i).filter((i) => cardMatches(hand[i], topCard, state.currentColor));
+
+  if (playableIndices.length === 0) return { action: "draw" };
+
+  if (difficulty === "easy") {
+    const index = playableIndices[Math.floor(Math.random() * playableIndices.length)];
+    const card = hand[index];
+    if (card.color === null) {
+      const chosenColor = COLORS[Math.floor(Math.random() * COLORS.length)];
+      return { action: "play", cardIndex: index, chosenColor };
+    }
+    return { action: "play", cardIndex: index };
+  }
+
+  if (difficulty === "hard") {
+    const opponentSymbol = symbol === "X" ? "O" : "X";
+    if (state.hands[opponentSymbol].length <= 2) {
+      const offensive = playableIndices.find((i) => ["draw2", "wild4", "skip", "reverse"].includes(hand[i].value));
+      if (offensive !== undefined) return playCardResult(hand, offensive);
+    }
+  }
+
+  const nonWildIndex = playableIndices.find((i) => hand[i].color !== null);
+  const chosenIndex = nonWildIndex !== undefined ? nonWildIndex : playableIndices[0];
+  return playCardResult(hand, chosenIndex);
+}

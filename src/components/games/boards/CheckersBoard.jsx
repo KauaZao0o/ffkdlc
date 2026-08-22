@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { getLegalMoves } from "@/lib/games/checkers.js";
 
 const SIZE = 8;
 
@@ -13,6 +14,23 @@ export default function CheckersBoard({ game, onMove }) {
   const canPlay = game.status === "playing" && game.turn === game.mySymbol;
   // Cada um vê suas próprias peças embaixo - se eu for "O", giro o tabuleiro.
   const flipped = game.mySymbol === "O";
+  // Regra de sequência de capturas: se a mesma peça ainda pode capturar de
+  // novo, o jogo trava a seleção nela - não dá pra trocar de peça no meio.
+  const forcedFrom = canPlay ? game.mustContinueFrom : null;
+  const activeFrom = forcedFrom ?? selected;
+
+  useEffect(() => {
+    if (forcedFrom !== null && forcedFrom !== undefined) setSelected(forcedFrom);
+  }, [forcedFrom]);
+
+  // Mostra pra onde a peça selecionada pode ir - já respeita captura
+  // obrigatória (se tiver captura em qualquer peça, só ela aparece como
+  // destino válido aqui).
+  const hints = useMemo(() => {
+    if (activeFrom === null || activeFrom === undefined || !canPlay) return new Map();
+    const moves = getLegalMoves(game, game.mySymbol).filter((m) => m.from === activeFrom);
+    return new Map(moves.map((m) => [m.to, m.capture]));
+  }, [game, canPlay, activeFrom]);
 
   function toBoardIndex(displayRow, displayCol) {
     const r = flipped ? SIZE - 1 - displayRow : displayRow;
@@ -22,6 +40,13 @@ export default function CheckersBoard({ game, onMove }) {
 
   function handleClick(boardIndex) {
     if (!canPlay) return;
+
+    if (forcedFrom !== null && forcedFrom !== undefined) {
+      if (boardIndex === forcedFrom) return;
+      onMove({ from: forcedFrom, to: boardIndex });
+      return;
+    }
+
     const piece = game.board[boardIndex];
 
     if (selected === null) {
@@ -49,43 +74,18 @@ export default function CheckersBoard({ game, onMove }) {
       const boardIndex = toBoardIndex(displayRow, displayCol);
       const dark = (displayRow + displayCol) % 2 === 1;
       const piece = game.board[boardIndex];
-      const isSelected = selected === boardIndex;
+      const isSelected = activeFrom === boardIndex;
+      const isCaptureHint = hints.get(boardIndex);
+      const isHint = hints.has(boardIndex);
+
+      const classNames = ["checkers-cell", dark ? "dark" : "light"];
+      if (isSelected) classNames.push("selected");
+      if (isHint) classNames.push(isCaptureHint ? "hint-capture" : "hint");
 
       cells.push(
-        <button
-          key={boardIndex}
-          onClick={() => handleClick(boardIndex)}
-          disabled={!dark}
-          style={{
-            width: "100%",
-            aspectRatio: "1 / 1",
-            border: isSelected ? "2px solid var(--success)" : "none",
-            background: dark ? "#3a2c22" : "#e9dcc9",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: 0,
-            cursor: dark && piece?.symbol === game.mySymbol ? "pointer" : dark ? "default" : "default",
-          }}
-        >
+        <button key={boardIndex} onClick={() => handleClick(boardIndex)} disabled={!dark} className={classNames.join(" ")}>
           {piece && (
-            <div
-              style={{
-                width: "76%",
-                height: "76%",
-                borderRadius: "50%",
-                background: piece.symbol === "X" ? "#d94848" : "#f2f2f2",
-                border: "2px solid rgba(0,0,0,0.35)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: 14,
-                color: piece.symbol === "X" ? "#fff" : "#333",
-                fontWeight: 700,
-              }}
-            >
-              {piece.king ? "♛" : ""}
-            </div>
+            <div className={`checkers-piece symbol-${piece.symbol.toLowerCase()}`}>{piece.king ? "♛" : ""}</div>
           )}
         </button>
       );
@@ -93,18 +93,11 @@ export default function CheckersBoard({ game, onMove }) {
   }
 
   return (
-    <div
-      style={{
-        display: "grid",
-        gridTemplateColumns: "repeat(8, 1fr)",
-        width: 264,
-        margin: "0 auto",
-        border: "2px solid var(--border)",
-        borderRadius: 6,
-        overflow: "hidden",
-      }}
-    >
-      {cells}
+    <div>
+      {forcedFrom !== null && forcedFrom !== undefined && (
+        <p style={{ margin: "0 0 8px", fontSize: 12, color: "var(--success)" }}>Continue capturando com a mesma peça</p>
+      )}
+      <div className="checkers-board">{cells}</div>
     </div>
   );
 }

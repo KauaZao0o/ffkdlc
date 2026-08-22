@@ -49,6 +49,7 @@ export function createInitialState() {
     table: [],
     roundsWon: { X: 0, O: 0 },
     roundsPlayed: 0,
+    trickResults: [],
     lastRound: null,
   };
 }
@@ -77,6 +78,8 @@ export function applyMove(state, move, symbol) {
   const roundsWon = { ...state.roundsWon };
   if (roundWinner) roundsWon[roundWinner] += 1;
   const roundsPlayed = state.roundsPlayed + 1;
+  const trickResults = [...(state.trickResults || []), roundWinner || "draw"];
+  // Quem venceu a rodada lidera a próxima; num empate, continua quem ia jogar.
   const nextTurn = roundWinner || state.turn;
 
   return {
@@ -84,19 +87,69 @@ export function applyMove(state, move, symbol) {
     table: [],
     roundsWon,
     roundsPlayed,
+    trickResults,
     turn: nextTurn,
     lastRound: { a, b, winner: roundWinner },
   };
 }
 
+// Regra de desempate do truco: quem vence as duas primeiras rodadas fecha a
+// mão; se a 1ª empata, quem vencer a 2ª já fecha (não precisa da 3ª); se
+// alguém vence a 1ª e a 2ª empata, esse alguém já fecha a mão; se a 1ª e a
+// 2ª forem de jogadores diferentes, decide a 3ª - e se a 3ª também
+// empatar, vence quem ganhou a 1ª rodada (ela "vale mais" no desempate).
 export function checkResult(state) {
-  const { roundsWon, roundsPlayed } = state;
-  if (roundsWon.X >= 2) return { winner: "X" };
-  if (roundsWon.O >= 2) return { winner: "O" };
-  if (roundsPlayed >= 3) {
-    if (roundsWon.X > roundsWon.O) return { winner: "X" };
-    if (roundsWon.O > roundsWon.X) return { winner: "O" };
-    return { winner: "draw" };
+  const [r1, r2, r3] = state.trickResults || [];
+  if (!r1) return null;
+
+  if (r1 !== "draw") {
+    if (!r2) return null;
+    if (r2 === r1) return { winner: r1 };
+    if (r2 === "draw") return { winner: r1 };
+    if (!r3) return null;
+    return { winner: r3 === "draw" ? r1 : r3 };
   }
-  return null;
+
+  // r1 === "draw"
+  if (!r2) return null;
+  if (r2 !== "draw") return { winner: r2 };
+  if (!r3) return null;
+  return r3 === "draw" ? { winner: "draw" } : { winner: r3 };
+}
+
+// difficulty: "easy" (joga carta aleatória da mão) | "medium" (se o
+// adversário já jogou, vence gastando a carta mais fraca possível ou
+// descarta a mais fraca; se for o primeiro a jogar, evita gastar a manilha
+// logo de cara) | "hard" (igual ao médio, mas quando não dá pra vencer a
+// rodada só descarta manilha se não sobrar outra carta - guarda ela pra
+// rodada decisiva).
+export function botMove(state, symbol, difficulty = "medium") {
+  const hand = state.hands[symbol];
+  if (hand.length === 0) return null;
+
+  if (difficulty === "easy") {
+    return { cardIndex: Math.floor(Math.random() * hand.length) };
+  }
+
+  const opponentPlay = state.table.find((p) => p.symbol !== symbol);
+  const ranked = hand
+    .map((card, i) => ({ i, strength: cardStrength(card, state.manilha) }))
+    .sort((a, b) => a.strength - b.strength);
+
+  if (opponentPlay) {
+    const opponentStrength = cardStrength(opponentPlay.card, state.manilha);
+    const winning = ranked.filter((c) => c.strength > opponentStrength);
+    if (winning.length > 0) return { cardIndex: winning[0].i };
+
+    if (difficulty === "hard") {
+      const nonManilha = ranked.filter((c) => c.strength < 100);
+      const pool = nonManilha.length > 0 ? nonManilha : ranked;
+      return { cardIndex: pool[0].i };
+    }
+    return { cardIndex: ranked[0].i };
+  }
+
+  const nonManilha = ranked.filter((c) => c.strength < 100);
+  const pool = nonManilha.length > 0 ? nonManilha : ranked;
+  return { cardIndex: pool[0].i };
 }
