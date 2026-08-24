@@ -115,10 +115,9 @@ function FileMessage({ url, isOwn }) {
 
 const MENU_WIDTH = 180;
 
-export default function MessageBubble({ message, isOwn, canDeleteForEveryone, onHideForMe, onDeleteForEveryone, onReply }) {
+export default function MessageBubble({ message, isOwn, canDeleteForEveryone, onHideForMe, onDeleteForEveryone, onReply, onImageClick }) {
   const [showMenu, setShowMenu] = useState(false);
   const [menuPos, setMenuPos] = useState(null);
-  const [showLightbox, setShowLightbox] = useState(false);
   const menuButtonRef = useRef(null);
   const menuRef = useRef(null);
   const { openProfile } = useProfileView();
@@ -293,7 +292,7 @@ export default function MessageBubble({ message, isOwn, canDeleteForEveryone, on
                 <img
                   src={message.fileUrl}
                   alt="Imagem enviada no chat"
-                  onClick={() => setShowLightbox(true)}
+                  onClick={() => onImageClick(message)}
                   style={{
                     maxWidth: "100%",
                     width: 220,
@@ -438,48 +437,6 @@ export default function MessageBubble({ message, isOwn, canDeleteForEveryone, on
               Apagar para todos
             </button>
           )}
-        </div>
-      )}
-
-      {isImage && showLightbox && (
-        <div
-          onClick={() => setShowLightbox(false)}
-          style={{
-            position: "fixed",
-            inset: 0,
-            zIndex: 100,
-            background: "rgba(0,0,0,0.85)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: 24,
-            cursor: "zoom-out",
-          }}
-        >
-          <img
-            src={message.fileUrl}
-            alt="Imagem enviada no chat"
-            onClick={(e) => e.stopPropagation()}
-            style={{ maxWidth: "92vw", maxHeight: "92vh", borderRadius: 8, objectFit: "contain", cursor: "default" }}
-          />
-          <button
-            onClick={() => setShowLightbox(false)}
-            title="Fechar"
-            style={{
-              position: "fixed",
-              top: 16,
-              right: 16,
-              width: 34,
-              height: 34,
-              borderRadius: "50%",
-              border: "none",
-              background: "rgba(255,255,255,0.15)",
-              color: "white",
-              fontSize: 16,
-            }}
-          >
-            ✕
-          </button>
         </div>
       )}
     </div>

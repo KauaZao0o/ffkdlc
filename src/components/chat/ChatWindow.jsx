@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/context/AuthContext.jsx";
 import { getSupabaseBrowserClient } from "@/lib/supabaseClient";
 import MessageBubble from "./MessageBubble.jsx";
 import MessageInput from "./MessageInput.jsx";
+import ImageLightbox from "./ImageLightbox.jsx";
 import CallAudioSettingsModal from "./CallAudioSettingsModal.jsx";
 import { useCall } from "@/context/CallContext.jsx";
 import { useProfileView } from "@/context/ProfileViewContext.jsx";
@@ -21,6 +22,7 @@ export default function ChatWindow({ conversation, onHideConversation, onBack, o
   const [participants, setParticipants] = useState([]);
   const [replyTo, setReplyTo] = useState(null);
   const [showAudioSettings, setShowAudioSettings] = useState(false);
+  const [lightboxId, setLightboxId] = useState(null);
   const { user } = useAuth();
   const call = useCall();
   const { openProfile } = useProfileView();
@@ -245,6 +247,12 @@ export default function ChatWindow({ conversation, onHideConversation, onBack, o
     }
   }
 
+  // Todas as fotos da conversa, na ordem exibida - é nessa lista que as
+  // setinhas do lightbox navegam, então pular pra próxima/anterior pula
+  // pra próxima/anterior foto da conversa, não só do mesmo bloco de mensagens.
+  const images = useMemo(() => messages.filter((m) => m.type === "image" && m.fileUrl), [messages]);
+  const lightboxIndex = images.findIndex((m) => m.id === lightboxId);
+
   if (!conversation) {
     return (
       <div className="chat-main" style={{ alignItems: "center", justifyContent: "center", color: "var(--text-faint)" }}>
@@ -374,6 +382,7 @@ export default function ChatWindow({ conversation, onHideConversation, onBack, o
               onHideForMe={handleHideForMe}
               onDeleteForEveryone={handleDeleteForEveryone}
               onReply={setReplyTo}
+              onImageClick={(msg) => setLightboxId(msg.id)}
             />
           ))}
           {typingUser && <p style={{ fontSize: 13, color: "var(--text-faint)", margin: 0 }}>digitando...</p>}
@@ -409,6 +418,14 @@ export default function ChatWindow({ conversation, onHideConversation, onBack, o
         onCancelReply={() => setReplyTo(null)}
       />
       {showAudioSettings && <CallAudioSettingsModal onClose={() => setShowAudioSettings(false)} />}
+      {lightboxIndex !== -1 && (
+        <ImageLightbox
+          images={images}
+          index={lightboxIndex}
+          onClose={() => setLightboxId(null)}
+          onNavigate={(nextIndex) => setLightboxId(images[nextIndex].id)}
+        />
+      )}
     </div>
   );
 }
