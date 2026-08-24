@@ -1058,3 +1058,88 @@ body.call-active .app-layout {
   border: 2px solid rgba(255, 255, 255, 0.35);
   flex-shrink: 0;
 }
+
+/* Xadrez */
+.chess-board {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  width: 280px;
+  margin: 0 auto;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.3);
+}
+.chess-cell {
+  aspect-ratio: 1 / 1;
+  border: none;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+.chess-cell.dark {
+  background: #7c9473;
+}
+.chess-cell.light {
+  background: #eeedd6;
+}
+.chess-cell.selected {
+  box-shadow: inset 0 0 0 3px var(--success);
+}
+.chess-cell.in-check {
+  box-shadow: inset 0 0 0 3px var(--danger);
+}
+.chess-cell.hint::after {
+  content: "";
+  position: absolute;
+  width: 26%;
+  height: 26%;
+  border-radius: 50%;
+  background: rgba(79, 168, 79, 0.55);
+}
+.chess-cell.hint-capture {
+  box-shadow: inset 0 0 0 3px rgba(224, 104, 90, 0.75);
+}
+.chess-piece {
+  font-size: 30px;
+  line-height: 1;
+  user-select: none;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.35));
+}
+.chess-piece.color-x {
+  color: #fdfdfb;
+}
+.chess-piece.color-o {
+  color: #1c1c1c;
+}
+
+/* Sinuca */
+.sinuca-table {
+  width: 100%;
+  max-width: 460px;
+  aspect-ratio: 2 / 1;
+  display: block;
+  margin: 0 auto;
+  border-radius: 16px;
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.3);
+}
+.sinuca-rail {
+  fill: #5b3a24;
+}
+.sinuca-felt {
+  fill: #1f6d45;
+}
+.sinuca-pocket {
+  fill: #0c0c0c;
+}
+.sinuca-aim-line {
+  stroke: rgba(255, 255, 255, 0.65);
+  stroke-width: 2;
+  stroke-dasharray: 6 6;
+}
+.sinuca-ball-label {
+  font-size: 10px;
+  font-weight: 700;
+  pointer-events: none;
+}

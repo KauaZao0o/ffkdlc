@@ -13,6 +13,8 @@ const GAME_DESCRIPTIONS = {
   checkers: "Regras configuráveis (captura obrigatória, sequência, dama voadora)",
   uno: "1 contra 1, mão de 7 cartas",
   truco: "1 contra 1, melhor de 3 rodadas por mão",
+  chess: "Xadrez completo: roque, en passant, promoção e xeque-mate",
+  sinuca: "Sinuca 8-bola com física de verdade - arraste pra mirar e tacar",
 };
 
 const DIFFICULTIES = [

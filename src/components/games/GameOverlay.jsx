@@ -9,12 +9,16 @@ import TicTacToeBoard from "./boards/TicTacToeBoard.jsx";
 import CheckersBoard from "./boards/CheckersBoard.jsx";
 import UnoBoard from "./boards/UnoBoard.jsx";
 import TrucoBoard from "./boards/TrucoBoard.jsx";
+import ChessBoard from "./boards/ChessBoard.jsx";
+import SinucaBoard from "./boards/SinucaBoard.jsx";
 
 const BOARDS = {
   tictactoe: TicTacToeBoard,
   checkers: CheckersBoard,
   uno: UnoBoard,
   truco: TrucoBoard,
+  chess: ChessBoard,
+  sinuca: SinucaBoard,
 };
 
 const DIFFICULTY_LABEL = { easy: "Fácil", medium: "Médio", hard: "Difícil" };
